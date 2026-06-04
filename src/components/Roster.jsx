@@ -2,16 +2,32 @@ import { useState, useEffect } from 'react'
 import sql from '../lib/db'
 import Modal from './Modal'
 
-const TIPOS = ['Bailes', 'Reviewers', 'Humor', 'Lifestyle', 'Música', 'Gaming', 'Otros']
+const TIPOS = ['Bailes', 'Reviewers', 'Humor', 'Lifestyle', 'Música', 'Gaming', 'Moda', 'Fitness', 'Viajes', 'Otros']
 
 const TIPO_COLORS = {
-  Bailes: { bg: '#EEEDFE', color: '#3C3489' },
+  Bailes:    { bg: '#EEEDFE', color: '#3C3489' },
   Reviewers: { bg: '#E6F1FB', color: '#0C447C' },
-  Humor: { bg: '#FAEEDA', color: '#633806' },
+  Humor:     { bg: '#FAEEDA', color: '#633806' },
   Lifestyle: { bg: '#E1F5EE', color: '#085041' },
-  Música: { bg: '#FAECE7', color: '#712B13' },
-  Gaming: { bg: '#FBEAF0', color: '#72243E' },
-  Otros: { bg: '#F1EFE8', color: '#444441' },
+  Música:    { bg: '#FAECE7', color: '#712B13' },
+  Gaming:    { bg: '#FBEAF0', color: '#72243E' },
+  Moda:      { bg: '#FEF0FB', color: '#6B1560' },
+  Fitness:   { bg: '#E8F5E9', color: '#1B5E20' },
+  Viajes:    { bg: '#E3F2FD', color: '#0D47A1' },
+  Otros:     { bg: '#F1EFE8', color: '#444441' },
+}
+
+const SIZE_RANGES = [
+  { label: 'Nano',  min: 0,       max: 10000,    bg: '#F1EFE8', color: '#5F5E5A' },
+  { label: 'Micro', min: 10000,   max: 150000,   bg: '#E6F1FB', color: '#0C447C' },
+  { label: 'Mid',   min: 150000,  max: 750000,   bg: '#EEEDFE', color: '#3C3489' },
+  { label: 'Macro', min: 750000,  max: 4000000,  bg: '#EAF3DE', color: '#27500A' },
+  { label: 'Mega',  min: 4000000, max: Infinity, bg: '#FAEEDA', color: '#633806' },
+]
+
+function getSize(n) {
+  n = Number(n)
+  return SIZE_RANGES.find(r => n >= r.min && n < r.max) || SIZE_RANGES[0]
 }
 
 const AV_COLORS = [
@@ -26,9 +42,10 @@ const AV_COLORS = [
 ]
 
 function fmtSeg(n) {
+  n = Number(n)
   if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M'
   if (n >= 1000) return Math.round(n / 1000) + 'K'
-  return Number(n).toLocaleString('es-CL')
+  return n.toLocaleString('es-CL')
 }
 
 function Avatar({ nombre, index, size = 32 }) {
@@ -49,36 +66,73 @@ function Avatar({ nombre, index, size = 32 }) {
 function UserLink({ username, link }) {
   if (!username) return <span style={{ color: '#CCC' }}>—</span>
   if (link) return (
-    <a
-      href={link}
-      target="_blank"
-      rel="noopener noreferrer"
+    <a href={link} target="_blank" rel="noopener noreferrer"
       style={{ color: '#E8313A', textDecoration: 'none', fontSize: 12.5 }}
       onMouseEnter={e => e.target.style.textDecoration = 'underline'}
       onMouseLeave={e => e.target.style.textDecoration = 'none'}
-    >
-      {username} ↗
-    </a>
+    >{username} ↗</a>
   )
   return <span style={{ fontSize: 12.5, color: '#555' }}>{username}</span>
 }
 
-function TipoBadge({ tipo }) {
-  const c = TIPO_COLORS[tipo] || TIPO_COLORS['Otros']
+function SizeBadge({ n, label }) {
+  const s = getSize(n)
   return (
-    <span style={{
-      background: c.bg, color: c.color,
-      padding: '2px 9px', borderRadius: 20, fontSize: 11,
-    }}>
-      {tipo}
+    <span style={{ background: s.bg, color: s.color, padding: '1px 7px', borderRadius: 20, fontSize: 10.5 }}>
+      {s.label} {label && <span style={{ opacity: 0.7 }}>· {label}</span>}
     </span>
+  )
+}
+
+function TiposBadges({ tipos }) {
+  if (!tipos || tipos.length === 0) return <span style={{ color: '#CCC', fontSize: 11 }}>—</span>
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+      {tipos.map(t => {
+        const c = TIPO_COLORS[t] || TIPO_COLORS['Otros']
+        return (
+          <span key={t} style={{ background: c.bg, color: c.color, padding: '1px 7px', borderRadius: 20, fontSize: 10.5 }}>
+            {t}
+          </span>
+        )
+      })}
+    </div>
+  )
+}
+
+function TiposCheckboxes({ selected, onChange }) {
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+      {TIPOS.map(t => {
+        const isSelected = selected.includes(t)
+        const c = TIPO_COLORS[t] || TIPO_COLORS['Otros']
+        return (
+          <div
+            key={t}
+            onClick={() => {
+              if (isSelected) onChange(selected.filter(x => x !== t))
+              else onChange([...selected, t])
+            }}
+            style={{
+              padding: '4px 10px', borderRadius: 20, fontSize: 12, cursor: 'pointer',
+              background: isSelected ? c.bg : '#F7F7F5',
+              color: isSelected ? c.color : '#888',
+              border: `0.5px solid ${isSelected ? c.color + '44' : '#E5E5E2'}`,
+              transition: 'all .12s', userSelect: 'none',
+            }}
+          >
+            {isSelected ? '✓ ' : ''}{t}
+          </div>
+        )
+      })}
+    </div>
   )
 }
 
 const EMPTY = {
   nombre: '', ig_usuario: '', ig_seguidores: '', ig_link: '',
   tt_usuario: '', tt_seguidores: '', tt_link: '',
-  tipo_contenido: 'Lifestyle', estado: 'Activo', notas: '',
+  tipos_contenido: [], estado: 'Activo', notas: '',
 }
 
 export default function Roster() {
@@ -86,6 +140,7 @@ export default function Roster() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [filterTipo, setFilterTipo] = useState('')
+  const [filterSize, setFilterSize] = useState('')
   const [filterEstado, setFilterEstado] = useState('')
   const [sortAsc, setSortAsc] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
@@ -124,7 +179,7 @@ export default function Roster() {
       tt_usuario: inf.tt_usuario || '',
       tt_seguidores: inf.tt_seguidores,
       tt_link: inf.tt_link || '',
-      tipo_contenido: inf.tipo_contenido,
+      tipos_contenido: inf.tipos_contenido || [],
       estado: inf.estado,
       notas: inf.notas || '',
     })
@@ -148,15 +203,15 @@ export default function Roster() {
             tt_usuario = ${form.tt_usuario},
             tt_seguidores = ${tt_seg},
             tt_link = ${form.tt_link},
-            tipo_contenido = ${form.tipo_contenido},
+            tipos_contenido = ${form.tipos_contenido},
             estado = ${form.estado},
             notas = ${form.notas}
           WHERE id = ${editId}
         `
       } else {
         await sql`
-          INSERT INTO influencers (nombre, ig_usuario, ig_seguidores, ig_link, tt_usuario, tt_seguidores, tt_link, tipo_contenido, estado, notas)
-          VALUES (${form.nombre}, ${form.ig_usuario}, ${ig_seg}, ${form.ig_link}, ${form.tt_usuario}, ${tt_seg}, ${form.tt_link}, ${form.tipo_contenido}, ${form.estado}, ${form.notas})
+          INSERT INTO influencers (nombre, ig_usuario, ig_seguidores, ig_link, tt_usuario, tt_seguidores, tt_link, tipos_contenido, estado, notas)
+          VALUES (${form.nombre}, ${form.ig_usuario}, ${ig_seg}, ${form.ig_link}, ${form.tt_usuario}, ${tt_seg}, ${form.tt_link}, ${form.tipos_contenido}, ${form.estado}, ${form.notas})
         `
       }
       setModalOpen(false)
@@ -179,9 +234,14 @@ export default function Roster() {
       const matchSearch = !q || i.nombre.toLowerCase().includes(q) ||
         (i.ig_usuario || '').toLowerCase().includes(q) ||
         (i.tt_usuario || '').toLowerCase().includes(q)
-      const matchTipo = !filterTipo || i.tipo_contenido === filterTipo
+      const tipos = i.tipos_contenido || []
+      const matchTipo = !filterTipo || tipos.includes(filterTipo)
       const matchEstado = !filterEstado || i.estado === filterEstado
-      return matchSearch && matchTipo && matchEstado
+      const matchSize = !filterSize || (
+        getSize(i.ig_seguidores).label === filterSize ||
+        getSize(i.tt_seguidores).label === filterSize
+      )
+      return matchSearch && matchTipo && matchEstado && matchSize
     })
     .sort((a, b) => {
       const diff = Number(b.total_seguidores) - Number(a.total_seguidores)
@@ -202,15 +262,17 @@ export default function Roster() {
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
         <input
-          className="input"
-          placeholder="Buscar nombre o usuario..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          style={{ minWidth: 220, flex: 1, maxWidth: 320 }}
+          className="input" placeholder="Buscar nombre o usuario..."
+          value={search} onChange={e => setSearch(e.target.value)}
+          style={{ minWidth: 220, flex: 1, maxWidth: 300 }}
         />
         <select className="input" value={filterTipo} onChange={e => setFilterTipo(e.target.value)}>
           <option value="">Todos los tipos</option>
           {TIPOS.map(t => <option key={t}>{t}</option>)}
+        </select>
+        <select className="input" value={filterSize} onChange={e => setFilterSize(e.target.value)}>
+          <option value="">Todos los tamaños</option>
+          {SIZE_RANGES.map(s => <option key={s.label}>{s.label}</option>)}
         </select>
         <select className="input" value={filterEstado} onChange={e => setFilterEstado(e.target.value)}>
           <option value="">Todos los estados</option>
@@ -224,62 +286,82 @@ export default function Roster() {
           <div style={{ padding: 40, textAlign: 'center', color: '#AAA', fontSize: 13 }}>Cargando...</div>
         ) : filtered.length === 0 ? (
           <div style={{ padding: 40, textAlign: 'center', color: '#AAA', fontSize: 13 }}>
-            {search || filterTipo || filterEstado ? 'Sin resultados para ese filtro' : 'Aún no hay influencers. Agrega el primero.'}
+            {search || filterTipo || filterEstado || filterSize ? 'Sin resultados para ese filtro' : 'Aún no hay influencers. Agrega el primero.'}
           </div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
               <thead>
                 <tr style={{ background: '#F7F7F5', borderBottom: '0.5px solid #E5E5E2' }}>
-                  <th className="th" style={{ width: 220 }}>Influencer</th>
-                  <th className="th" style={{ width: 150 }}>Instagram</th>
-                  <th className="th" style={{ width: 150 }}>TikTok</th>
+                  <th className="th" style={{ width: 200 }}>Influencer</th>
+                  <th className="th" style={{ width: 160 }}>Instagram</th>
+                  <th className="th" style={{ width: 160 }}>TikTok</th>
                   <th className="th" style={{ width: 110, cursor: 'pointer', userSelect: 'none' }} onClick={() => setSortAsc(s => !s)}>
                     Total seg. {sortAsc ? '↑' : '↓'}
                   </th>
-                  <th className="th" style={{ width: 100 }}>Tipo</th>
+                  <th className="th" style={{ width: 180 }}>Categorías</th>
                   <th className="th" style={{ width: 80 }}>Estado</th>
                   <th className="th" style={{ width: 70 }}></th>
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((inf, i) => (
-                  <tr key={inf.id} style={{ borderBottom: '0.5px solid #F0F0EE' }}>
-                    <td className="td">
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-                        <Avatar nombre={inf.nombre} index={i} />
-                        <span style={{ fontWeight: 500, fontSize: 13 }}>{inf.nombre}</span>
-                      </div>
-                    </td>
-                    <td className="td">
-                      <UserLink username={inf.ig_usuario} link={inf.ig_link} />
-                      <div style={{ fontSize: 11, color: '#AAA' }}>{inf.ig_seguidores ? fmtSeg(inf.ig_seguidores) : ''}</div>
-                    </td>
-                    <td className="td">
-                      <UserLink username={inf.tt_usuario} link={inf.tt_link} />
-                      <div style={{ fontSize: 11, color: '#AAA' }}>{inf.tt_seguidores ? fmtSeg(inf.tt_seguidores) : ''}</div>
-                    </td>
-                    <td className="td">
-                      <span style={{ fontWeight: 500, fontSize: 13 }}>{fmtSeg(Number(inf.total_seguidores))}</span>
-                    </td>
-                    <td className="td"><TipoBadge tipo={inf.tipo_contenido} /></td>
-                    <td className="td">
-                      <span style={{
-                        background: inf.estado === 'Activo' ? '#EAF3DE' : '#F1EFE8',
-                        color: inf.estado === 'Activo' ? '#27500A' : '#5F5E5A',
-                        padding: '2px 9px', borderRadius: 20, fontSize: 11,
-                      }}>
-                        {inf.estado}
-                      </span>
-                    </td>
-                    <td className="td">
-                      <div style={{ display: 'flex', gap: 4 }}>
-                        <button className="btn-icon" onClick={() => openEdit(inf)} title="Editar">✎</button>
-                        <button className="btn-icon btn-icon-danger" onClick={() => setDeleteId(inf.id)} title="Eliminar">✕</button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                {filtered.map((inf, i) => {
+                  const igSize = getSize(inf.ig_seguidores)
+                  const ttSize = getSize(inf.tt_seguidores)
+                  return (
+                    <tr key={inf.id} style={{ borderBottom: '0.5px solid #F0F0EE' }}>
+                      <td className="td">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+                          <Avatar nombre={inf.nombre} index={i} />
+                          <span style={{ fontWeight: 500, fontSize: 13 }}>{inf.nombre}</span>
+                        </div>
+                      </td>
+                      <td className="td">
+                        <UserLink username={inf.ig_usuario} link={inf.ig_link} />
+                        {inf.ig_seguidores > 0 && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 3 }}>
+                            <span style={{ fontSize: 11, color: '#AAA' }}>{fmtSeg(inf.ig_seguidores)}</span>
+                            <span style={{ background: igSize.bg, color: igSize.color, padding: '0px 6px', borderRadius: 20, fontSize: 10 }}>
+                              {igSize.label}
+                            </span>
+                          </div>
+                        )}
+                      </td>
+                      <td className="td">
+                        <UserLink username={inf.tt_usuario} link={inf.tt_link} />
+                        {inf.tt_seguidores > 0 && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 3 }}>
+                            <span style={{ fontSize: 11, color: '#AAA' }}>{fmtSeg(inf.tt_seguidores)}</span>
+                            <span style={{ background: ttSize.bg, color: ttSize.color, padding: '0px 6px', borderRadius: 20, fontSize: 10 }}>
+                              {ttSize.label}
+                            </span>
+                          </div>
+                        )}
+                      </td>
+                      <td className="td">
+                        <span style={{ fontWeight: 500, fontSize: 13 }}>{fmtSeg(Number(inf.total_seguidores))}</span>
+                      </td>
+                      <td className="td">
+                        <TiposBadges tipos={inf.tipos_contenido} />
+                      </td>
+                      <td className="td">
+                        <span style={{
+                          background: inf.estado === 'Activo' ? '#EAF3DE' : '#F1EFE8',
+                          color: inf.estado === 'Activo' ? '#27500A' : '#5F5E5A',
+                          padding: '2px 9px', borderRadius: 20, fontSize: 11,
+                        }}>
+                          {inf.estado}
+                        </span>
+                      </td>
+                      <td className="td">
+                        <div style={{ display: 'flex', gap: 4 }}>
+                          <button className="btn-icon" onClick={() => openEdit(inf)} title="Editar">✎</button>
+                          <button className="btn-icon btn-icon-danger" onClick={() => setDeleteId(inf.id)} title="Eliminar">✕</button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>
@@ -319,24 +401,26 @@ export default function Roster() {
           <label className="label">Link TikTok</label>
           <input className="input" value={form.tt_link} onChange={e => setForm(f => ({ ...f, tt_link: e.target.value }))} placeholder="https://tiktok.com/@usuario" />
         </div>
-        <div className="form-row-2">
-          <div className="fg">
-            <label className="label">Tipo de contenido</label>
-            <select className="input" value={form.tipo_contenido} onChange={e => setForm(f => ({ ...f, tipo_contenido: e.target.value }))}>
-              {TIPOS.map(t => <option key={t}>{t}</option>)}
-            </select>
-          </div>
-          <div className="fg">
-            <label className="label">Estado</label>
-            <select className="input" value={form.estado} onChange={e => setForm(f => ({ ...f, estado: e.target.value }))}>
-              <option>Activo</option>
-              <option>Inactivo</option>
-            </select>
-          </div>
+        <div className="fg">
+          <label className="label">Categorías de contenido</label>
+          <TiposCheckboxes
+            selected={form.tipos_contenido}
+            onChange={tipos => setForm(f => ({ ...f, tipos_contenido: tipos }))}
+          />
+          {form.tipos_contenido.length === 0 && (
+            <div style={{ fontSize: 11, color: '#CCC', marginTop: 4 }}>Selecciona al menos una categoría</div>
+          )}
+        </div>
+        <div className="fg">
+          <label className="label">Estado</label>
+          <select className="input" value={form.estado} onChange={e => setForm(f => ({ ...f, estado: e.target.value }))}>
+            <option>Activo</option>
+            <option>Inactivo</option>
+          </select>
         </div>
         <div className="fg">
           <label className="label">Notas internas</label>
-          <textarea className="input" rows={3} value={form.notas} onChange={e => setForm(f => ({ ...f, notas: e.target.value }))} placeholder="Solo visible para el equipo..." style={{ resize: 'vertical' }} />
+          <textarea className="input" rows={2} value={form.notas} onChange={e => setForm(f => ({ ...f, notas: e.target.value }))} placeholder="Solo visible para el equipo..." style={{ resize: 'vertical' }} />
         </div>
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
           <button className="btn-ghost" onClick={() => setModalOpen(false)}>Cancelar</button>
@@ -347,9 +431,7 @@ export default function Roster() {
       </Modal>
 
       <Modal open={!!deleteId} onClose={() => setDeleteId(null)} title="Eliminar influencer">
-        <p style={{ fontSize: 13, color: '#555', marginBottom: 20 }}>
-          ¿Estás segura? Esta acción no se puede deshacer.
-        </p>
+        <p style={{ fontSize: 13, color: '#555', marginBottom: 20 }}>¿Estás segura? Esta acción no se puede deshacer.</p>
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
           <button className="btn-ghost" onClick={() => setDeleteId(null)}>Cancelar</button>
           <button className="btn-danger" onClick={() => handleDelete(deleteId)}>Eliminar</button>
