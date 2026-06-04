@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Sidebar from './components/Sidebar'
 import Roster from './components/Roster'
 import Campanas from './components/Campanas'
+import VistaCliente from './components/VistaCliente'
 import './index.css'
 
 function Placeholder({ title }) {
@@ -14,11 +15,20 @@ function Placeholder({ title }) {
 
 export default function App() {
   const [page, setPage] = useState('roster')
-  const [sharedCamp, setSharedCamp] = useState(null)
+  const [publicToken, setPublicToken] = useState(null)
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const token = params.get('token')
+    if (token) setPublicToken(token)
+  }, [])
 
   function handleShareCamp(camp) {
-    setSharedCamp(camp)
-    setPage('compartir')
+    setPage('campanas')
+  }
+
+  if (publicToken) {
+    return <VistaCliente token={publicToken} />
   }
 
   return (
@@ -28,7 +38,6 @@ export default function App() {
         {page === 'dashboard' && <Placeholder title="Dashboard" />}
         {page === 'roster' && <Roster />}
         {page === 'campanas' && <Campanas onShareCamp={handleShareCamp} />}
-        {page === 'compartir' && <Placeholder title="Vista cliente" />}
       </main>
     </div>
   )
