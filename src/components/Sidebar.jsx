@@ -18,7 +18,7 @@ export default function Sidebar({ page, setPage, onLogout }) {
           fontSize: 12, fontWeight: 700, color: '#fff', flexShrink: 0,
         }}>R</div>
         <div>
-          <div style={{ fontSize: 14, fontWeight: 500 }}>RUIDO</div>
+          <div style={{ fontSize: 14, fontWeight: 500 }}>RUIDO LAB</div>
           <div style={{ fontSize: 11, color: '#AAA' }}>Influencer MKT</div>
         </div>
       </div>
