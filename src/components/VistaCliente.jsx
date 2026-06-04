@@ -2,13 +2,29 @@ import { useState, useEffect } from 'react'
 import sql from '../lib/db'
 
 const TIPO_COLORS = {
-  Bailes: { bg: '#EEEDFE', color: '#3C3489' },
+  Bailes:    { bg: '#EEEDFE', color: '#3C3489' },
   Reviewers: { bg: '#E6F1FB', color: '#0C447C' },
-  Humor: { bg: '#FAEEDA', color: '#633806' },
+  Humor:     { bg: '#FAEEDA', color: '#633806' },
   Lifestyle: { bg: '#E1F5EE', color: '#085041' },
-  Música: { bg: '#FAECE7', color: '#712B13' },
-  Gaming: { bg: '#FBEAF0', color: '#72243E' },
-  Otros: { bg: '#F1EFE8', color: '#444441' },
+  Música:    { bg: '#FAECE7', color: '#712B13' },
+  Gaming:    { bg: '#FBEAF0', color: '#72243E' },
+  Moda:      { bg: '#FEF0FB', color: '#6B1560' },
+  Fitness:   { bg: '#E8F5E9', color: '#1B5E20' },
+  Viajes:    { bg: '#E3F2FD', color: '#0D47A1' },
+  Otros:     { bg: '#F1EFE8', color: '#444441' },
+}
+
+const SIZE_RANGES = [
+  { label: 'Nano',  min: 0,       max: 10000 },
+  { label: 'Micro', min: 10000,   max: 150000 },
+  { label: 'Mid',   min: 150000,  max: 750000 },
+  { label: 'Macro', min: 750000,  max: 4000000 },
+  { label: 'Mega',  min: 4000000, max: Infinity },
+]
+
+function getSize(n) {
+  n = Number(n)
+  return SIZE_RANGES.find(r => n >= r.min && n < r.max)?.label || 'Nano'
 }
 
 const AV_COLORS = [
@@ -44,24 +60,14 @@ function Avatar({ nombre, index, size = 36 }) {
   )
 }
 
-function ProfileLink({ username, link, platform }) {
+function ProfileLink({ username, link }) {
   if (!username) return <span style={{ color: '#CCC', fontSize: 13 }}>—</span>
-  const color = platform === 'ig' ? '#C2185B' : '#1A1A1A'
   if (link) return (
-    <a
-      href={link}
-      target="_blank"
-      rel="noopener noreferrer"
-      style={{
-        color, fontWeight: 500, textDecoration: 'none', fontSize: 13,
-        display: 'inline-flex', alignItems: 'center', gap: 3,
-      }}
+    <a href={link} target="_blank" rel="noopener noreferrer"
+      style={{ color: '#E8313A', fontWeight: 500, textDecoration: 'none', fontSize: 13 }}
       onMouseEnter={e => e.currentTarget.style.textDecoration = 'underline'}
       onMouseLeave={e => e.currentTarget.style.textDecoration = 'none'}
-    >
-      {username}
-      <span style={{ fontSize: 10, opacity: 0.6 }}>↗</span>
-    </a>
+    >{username} <span style={{ fontSize: 10, opacity: 0.6 }}>↗</span></a>
   )
   return <span style={{ fontSize: 13, color: '#555', fontWeight: 500 }}>{username}</span>
 }
@@ -71,26 +77,23 @@ export default function VistaCliente({ token }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
-  useEffect(() => {
-    if (token) fetchPublicCamp(token)
-  }, [token])
+  useEffect(() => { if (token) fetchPublicCamp(token) }, [token])
 
   async function fetchPublicCamp(t) {
     setLoading(true)
     try {
       const rows = await sql`
         SELECT
-          c.nombre AS camp_nombre,
-          c.cliente,
+          c.nombre AS camp_nombre, c.cliente, c.plataforma,
           i.nombre,
           i.ig_usuario, i.ig_seguidores, i.ig_link,
           i.tt_usuario, i.tt_seguidores, i.tt_link,
-          i.tipo_contenido, i.avatar_url
+          i.tipos_contenido, i.avatar_url,
+          ci.video_link
         FROM campaigns c
         JOIN campaign_influencers ci ON ci.campaign_id = c.id
         JOIN influencers i ON i.id = ci.influencer_id
-        WHERE c.share_token = ${t}
-          AND c.share_active = true
+        WHERE c.share_token = ${t} AND c.share_active = true
       `
       if (rows.length === 0) {
         const check = await sql`SELECT id FROM campaigns WHERE share_token = ${t}`
@@ -99,13 +102,11 @@ export default function VistaCliente({ token }) {
         setCamp({
           nombre: rows[0].camp_nombre,
           cliente: rows[0].cliente,
+          plataforma: rows[0].plataforma || 'Ambas',
           influencers: rows,
         })
       }
-    } catch (e) {
-      console.error(e)
-      setError('error')
-    }
+    } catch (e) { console.error(e); setError('error') }
     setLoading(false)
   }
 
@@ -120,18 +121,24 @@ export default function VistaCliente({ token }) {
       <div style={{ textAlign: 'center', color: '#AAA' }}>
         <div style={{ fontSize: 32, marginBottom: 12 }}>◈</div>
         <div style={{ fontSize: 15, fontWeight: 500, color: '#555', marginBottom: 6 }}>
-          {error === 'not_found' ? 'Propuesta no encontrada' : error === 'inactive' ? 'Este link ha sido desactivado' : 'Error al cargar la propuesta'}
+          {error === 'not_found' ? 'Propuesta no encontrada' : error === 'inactive' ? 'Este link ha sido desactivado' : 'Error al cargar'}
         </div>
         <div style={{ fontSize: 13 }}>
-          {error === 'not_found' ? 'Verifica el link con tu agencia.' : error === 'inactive' ? 'Contacta a tu agencia para obtener un link actualizado.' : 'Intenta recargar la página.'}
+          {error === 'not_found' ? 'Verifica el link con tu agencia.' : 'Contacta a tu agencia para obtener un link actualizado.'}
         </div>
       </div>
     </div>
   )
 
-  const totalSeg = camp.influencers.reduce((s, i) => s + Number(i.ig_seguidores) + Number(i.tt_seguidores), 0)
+  const plat = camp.plataforma || 'Ambas'
+  const showIG = plat === 'Ambas' || plat === 'Instagram'
+  const showTT = plat === 'Ambas' || plat === 'TikTok'
+
   const totalIG = camp.influencers.reduce((s, i) => s + Number(i.ig_seguidores), 0)
   const totalTT = camp.influencers.reduce((s, i) => s + Number(i.tt_seguidores), 0)
+  const totalSeg = (showIG ? totalIG : 0) + (showTT ? totalTT : 0)
+
+  const hasVideos = camp.influencers.some(i => i.video_link)
 
   return (
     <div style={{ minHeight: '100vh', background: '#F7F7F5', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
@@ -144,20 +151,34 @@ export default function VistaCliente({ token }) {
             <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', letterSpacing: '.05em' }}>RUIDO LAB — Influencer MKT</span>
           </div>
           <h1 style={{ fontSize: 22, fontWeight: 500, color: '#fff', marginBottom: 4 }}>{camp.nombre}</h1>
-          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)' }}>Propuesta para {camp.cliente}</p>
+          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)' }}>
+            Propuesta para {camp.cliente}
+            {plat !== 'Ambas' && <span style={{ marginLeft: 8, background: 'rgba(255,255,255,0.1)', padding: '1px 8px', borderRadius: 20, fontSize: 11 }}>{plat}</span>}
+          </p>
         </div>
         <div style={{ display: 'flex', gap: 20, textAlign: 'right', flexWrap: 'wrap' }}>
-          {[
-            { label: 'Influencers', value: camp.influencers.length },
-            { label: 'Alcance total', value: fmtSeg(totalSeg) },
-            { label: 'Instagram', value: fmtSeg(totalIG) },
-            { label: 'TikTok', value: fmtSeg(totalTT) },
-          ].map(({ label, value }) => (
-            <div key={label}>
-              <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 4 }}>{label}</div>
-              <div style={{ fontSize: 20, fontWeight: 500, color: '#fff' }}>{value}</div>
+          <div>
+            <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 4 }}>Influencers</div>
+            <div style={{ fontSize: 20, fontWeight: 500, color: '#fff' }}>{camp.influencers.length}</div>
+          </div>
+          {showIG && (
+            <div>
+              <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 4 }}>Instagram</div>
+              <div style={{ fontSize: 20, fontWeight: 500, color: '#fff' }}>{fmtSeg(totalIG)}</div>
             </div>
-          ))}
+          )}
+          {showTT && (
+            <div>
+              <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 4 }}>TikTok</div>
+              <div style={{ fontSize: 20, fontWeight: 500, color: '#fff' }}>{fmtSeg(totalTT)}</div>
+            </div>
+          )}
+          {plat === 'Ambas' && (
+            <div>
+              <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 4 }}>Alcance total</div>
+              <div style={{ fontSize: 20, fontWeight: 500, color: '#fff' }}>{fmtSeg(totalSeg)}</div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -165,23 +186,21 @@ export default function VistaCliente({ token }) {
       <div style={{ padding: '28px 40px' }}>
         <div style={{ background: '#fff', border: '0.5px solid #E5E5E2', borderRadius: 12, overflow: 'hidden' }}>
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ background: '#F7F7F5', borderBottom: '0.5px solid #E5E5E2' }}>
-                  {['Influencer', 'Instagram', 'TikTok', 'Total seg.', 'Tipo'].map((h, i) => (
-                    <th key={h} style={{
-                      padding: '11px 16px', textAlign: 'left',
-                      fontSize: 10.5, fontWeight: 500,
-                      textTransform: 'uppercase', letterSpacing: '.08em', color: '#AAA',
-                      width: [220, 160, 160, 110, 110][i],
-                    }}>{h}</th>
-                  ))}
+                  <th style={{ padding: '11px 16px', textAlign: 'left', fontSize: 10.5, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '.08em', color: '#AAA', width: 200 }}>Influencer</th>
+                  {showIG && <th style={{ padding: '11px 16px', textAlign: 'left', fontSize: 10.5, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '.08em', color: '#AAA', width: 160 }}>Instagram</th>}
+                  {showTT && <th style={{ padding: '11px 16px', textAlign: 'left', fontSize: 10.5, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '.08em', color: '#AAA', width: 160 }}>TikTok</th>}
+                  <th style={{ padding: '11px 16px', textAlign: 'left', fontSize: 10.5, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '.08em', color: '#AAA', width: 160 }}>Categorías</th>
+                  {hasVideos && <th style={{ padding: '11px 16px', textAlign: 'left', fontSize: 10.5, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '.08em', color: '#AAA', width: 80 }}>Video</th>}
                 </tr>
               </thead>
               <tbody>
                 {camp.influencers.map((inf, i) => {
-                  const total = Number(inf.ig_seguidores) + Number(inf.tt_seguidores)
-                  const tc = TIPO_COLORS[inf.tipo_contenido] || TIPO_COLORS['Otros']
+                  const tipos = inf.tipos_contenido || []
+                  const igSize = getSize(inf.ig_seguidores)
+                  const ttSize = getSize(inf.tt_seguidores)
                   return (
                     <tr key={i} style={{ borderBottom: i < camp.influencers.length - 1 ? '0.5px solid #F0F0EE' : 'none' }}>
                       <td style={{ padding: '13px 16px', verticalAlign: 'middle' }}>
@@ -190,26 +209,50 @@ export default function VistaCliente({ token }) {
                           <span style={{ fontWeight: 500, fontSize: 13 }}>{inf.nombre}</span>
                         </div>
                       </td>
+                      {showIG && (
+                        <td style={{ padding: '13px 16px', verticalAlign: 'middle' }}>
+                          <ProfileLink username={inf.ig_usuario} link={inf.ig_link} />
+                          {inf.ig_seguidores > 0 && (
+                            <div style={{ fontSize: 11, color: '#AAA', marginTop: 2 }}>
+                              {fmtSeg(inf.ig_seguidores)}
+                              <span style={{ marginLeft: 4, fontSize: 10, background: '#F1EFE8', color: '#5F5E5A', padding: '0 5px', borderRadius: 10 }}>{igSize}</span>
+                            </div>
+                          )}
+                        </td>
+                      )}
+                      {showTT && (
+                        <td style={{ padding: '13px 16px', verticalAlign: 'middle' }}>
+                          <ProfileLink username={inf.tt_usuario} link={inf.tt_link} />
+                          {inf.tt_seguidores > 0 && (
+                            <div style={{ fontSize: 11, color: '#AAA', marginTop: 2 }}>
+                              {fmtSeg(inf.tt_seguidores)}
+                              <span style={{ marginLeft: 4, fontSize: 10, background: '#F1EFE8', color: '#5F5E5A', padding: '0 5px', borderRadius: 10 }}>{ttSize}</span>
+                            </div>
+                          )}
+                        </td>
+                      )}
                       <td style={{ padding: '13px 16px', verticalAlign: 'middle' }}>
-                        <ProfileLink username={inf.ig_usuario} link={inf.ig_link} platform="ig" />
-                        <div style={{ fontSize: 11, color: '#AAA', marginTop: 1 }}>
-                          {inf.ig_seguidores ? fmtSeg(inf.ig_seguidores) + ' seg.' : ''}
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+                          {tipos.map(t => {
+                            const c = TIPO_COLORS[t] || TIPO_COLORS['Otros']
+                            return <span key={t} style={{ background: c.bg, color: c.color, padding: '2px 8px', borderRadius: 20, fontSize: 11 }}>{t}</span>
+                          })}
+                          {tipos.length === 0 && <span style={{ color: '#CCC', fontSize: 12 }}>—</span>}
                         </div>
                       </td>
-                      <td style={{ padding: '13px 16px', verticalAlign: 'middle' }}>
-                        <ProfileLink username={inf.tt_usuario} link={inf.tt_link} platform="tt" />
-                        <div style={{ fontSize: 11, color: '#AAA', marginTop: 1 }}>
-                          {inf.tt_seguidores ? fmtSeg(inf.tt_seguidores) + ' seg.' : ''}
-                        </div>
-                      </td>
-                      <td style={{ padding: '13px 16px', verticalAlign: 'middle', fontWeight: 500, fontSize: 13 }}>
-                        {fmtSeg(total)}
-                      </td>
-                      <td style={{ padding: '13px 16px', verticalAlign: 'middle' }}>
-                        <span style={{ background: tc.bg, color: tc.color, padding: '2px 9px', borderRadius: 20, fontSize: 11 }}>
-                          {inf.tipo_contenido}
-                        </span>
-                      </td>
+                      {hasVideos && (
+                        <td style={{ padding: '13px 16px', verticalAlign: 'middle' }}>
+                          {inf.video_link ? (
+                            <a href={inf.video_link} target="_blank" rel="noopener noreferrer"
+                              style={{ color: '#E8313A', fontSize: 13, textDecoration: 'none', fontWeight: 500 }}
+                              onMouseEnter={e => e.currentTarget.style.textDecoration = 'underline'}
+                              onMouseLeave={e => e.currentTarget.style.textDecoration = 'none'}
+                            >Ver ↗</a>
+                          ) : (
+                            <span style={{ color: '#CCC', fontSize: 12 }}>—</span>
+                          )}
+                        </td>
+                      )}
                     </tr>
                   )
                 })}
@@ -223,15 +266,29 @@ export default function VistaCliente({ token }) {
               <div style={{ fontSize: 10.5, color: '#AAA', textTransform: 'uppercase', letterSpacing: '.07em' }}>Total influencers</div>
               <div style={{ fontSize: 16, fontWeight: 500 }}>{camp.influencers.length}</div>
             </div>
-            <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: 10.5, color: '#AAA', textTransform: 'uppercase', letterSpacing: '.07em' }}>Alcance total</div>
-              <div style={{ fontSize: 16, fontWeight: 500 }}>{fmtSeg(totalSeg)}</div>
-            </div>
+            {showIG && (
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: 10.5, color: '#AAA', textTransform: 'uppercase', letterSpacing: '.07em' }}>Instagram</div>
+                <div style={{ fontSize: 16, fontWeight: 500 }}>{fmtSeg(totalIG)}</div>
+              </div>
+            )}
+            {showTT && (
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: 10.5, color: '#AAA', textTransform: 'uppercase', letterSpacing: '.07em' }}>TikTok</div>
+                <div style={{ fontSize: 16, fontWeight: 500 }}>{fmtSeg(totalTT)}</div>
+              </div>
+            )}
+            {plat === 'Ambas' && (
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: 10.5, color: '#AAA', textTransform: 'uppercase', letterSpacing: '.07em' }}>Alcance total</div>
+                <div style={{ fontSize: 16, fontWeight: 500 }}>{fmtSeg(totalSeg)}</div>
+              </div>
+            )}
           </div>
         </div>
 
         <div style={{ marginTop: 20, textAlign: 'center', fontSize: 11, color: '#CCC' }}>
-          Propuesta generada por RUIDO Influencer MKT
+          Propuesta generada por RUIDO LAB — Influencer MKT
         </div>
       </div>
     </div>
