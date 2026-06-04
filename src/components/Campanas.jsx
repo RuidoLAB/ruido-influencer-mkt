@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import sql from '../lib/db'
 import Modal from './Modal'
+import SharePanel from './SharePanel'
 
-const ESTADOS_CAMP = ['Activa', 'Pausada', 'Cerrada']
 const ESTADOS_INF = ['Contactado', 'Negociando', 'Confirmado', 'Brief enviado', 'Contenido recibido', 'Publicado']
 
 const ESTADO_INF_COLORS = {
@@ -131,7 +131,7 @@ function BudgetSummary({ camp }) {
 const EMPTY_CAMP = { nombre: '', cliente: '', budget: '', moneda: 'CLP', brief: '' }
 const EMPTY_CI = { costo: '', piezas: '1', estado: 'Contactado', notas: '' }
 
-export default function Campanas({ onShareCamp }) {
+export default function Campanas() {
   const [camps, setCamps] = useState([])
   const [loading, setLoading] = useState(true)
   const [currentCamp, setCurrentCamp] = useState(null)
@@ -320,7 +320,6 @@ export default function Campanas({ onShareCamp }) {
   if (currentCamp) {
     return (
       <div style={{ padding: '20px 24px' }}>
-        {/* Header detalle */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
           <div>
             <div
@@ -332,13 +331,11 @@ export default function Campanas({ onShareCamp }) {
             <h1 style={{ fontSize: 20, fontWeight: 500 }}>{currentCamp.nombre}</h1>
             <p style={{ fontSize: 12, color: '#888', marginTop: 2 }}>{currentCamp.cliente} · {currentCamp.moneda}</p>
           </div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button className="btn-ghost" onClick={() => onShareCamp(currentCamp)}>↗ Vista cliente</button>
-            <button className="btn-red" onClick={openAddInf}>+ Agregar influencer</button>
-          </div>
+          <button className="btn-red" onClick={openAddInf}>+ Agregar influencer</button>
         </div>
 
         <BudgetSummary camp={currentCamp} />
+        <SharePanel camp={currentCamp} onUpdate={fetchCamps} />
 
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
           <h2 style={{ fontSize: 14, fontWeight: 500 }}>Influencers en campaña</h2>
@@ -408,7 +405,6 @@ export default function Campanas({ onShareCamp }) {
           )}
         </div>
 
-        {/* Modal agregar influencer */}
         <Modal open={modalAddInf} onClose={() => setModalAddInf(false)} title="Agregar influencer">
           <div className="fg">
             <label className="label">Buscar en roster</label>
@@ -450,7 +446,6 @@ export default function Campanas({ onShareCamp }) {
               </div>
             ))}
           </div>
-
           {selInf && (
             <div style={{ borderTop: '0.5px solid #F0F0EE', paddingTop: 14 }}>
               <div style={{ fontSize: 12, color: '#888', marginBottom: 10 }}>
@@ -478,7 +473,6 @@ export default function Campanas({ onShareCamp }) {
               </div>
             </div>
           )}
-
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
             <button className="btn-ghost" onClick={() => setModalAddInf(false)}>Cancelar</button>
             <button className="btn-red" onClick={addInfluencer} disabled={!selInf || savingCI}>
@@ -487,7 +481,6 @@ export default function Campanas({ onShareCamp }) {
           </div>
         </Modal>
 
-        {/* Modal editar influencer en campaña */}
         <Modal open={editCIModal} onClose={() => setEditCIModal(false)} title={`Editar — ${editCI?.nombre}`}>
           <div className="form-row-2">
             <div className="fg">
@@ -515,7 +508,6 @@ export default function Campanas({ onShareCamp }) {
           </div>
         </Modal>
 
-        {/* Modal confirmar quitar influencer */}
         <Modal open={!!deleteCI} onClose={() => setDeleteCI(null)} title="Quitar influencer">
           <p style={{ fontSize: 13, color: '#555', marginBottom: 20 }}>
             ¿Quitar este influencer de la campaña? Los datos de costo y estado se perderán.
@@ -531,7 +523,6 @@ export default function Campanas({ onShareCamp }) {
 
   return (
     <div style={{ padding: '20px 24px' }}>
-      {/* Header lista */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
         <div>
           <h1 style={{ fontSize: 20, fontWeight: 500 }}>Campañas</h1>
@@ -540,7 +531,6 @@ export default function Campanas({ onShareCamp }) {
         <button className="btn-red" onClick={() => { setCampForm(EMPTY_CAMP); setModalNewCamp(true) }}>+ Nueva campaña</button>
       </div>
 
-      {/* Grid de campañas */}
       {camps.length === 0 ? (
         <div style={{ padding: 60, textAlign: 'center', color: '#AAA', fontSize: 13 }}>
           Aún no hay campañas. Crea la primera.
@@ -591,7 +581,6 @@ export default function Campanas({ onShareCamp }) {
         </div>
       )}
 
-      {/* Modal nueva campaña */}
       <Modal open={modalNewCamp} onClose={() => setModalNewCamp(false)} title="Nueva campaña">
         <div className="fg">
           <label className="label">Nombre de campaña</label>
@@ -626,7 +615,6 @@ export default function Campanas({ onShareCamp }) {
         </div>
       </Modal>
 
-      {/* Modal confirmar eliminar campaña */}
       <Modal open={!!deleteCampId} onClose={() => setDeleteCampId(null)} title="Eliminar campaña">
         <p style={{ fontSize: 13, color: '#555', marginBottom: 20 }}>
           ¿Eliminar esta campaña? Se borrarán todos los influencers asociados. Esta acción no se puede deshacer.
