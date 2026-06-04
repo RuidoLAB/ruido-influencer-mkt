@@ -54,9 +54,7 @@ function Avatar({ nombre, index, size = 36 }) {
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       fontSize: size * 0.38, fontWeight: 500, flexShrink: 0,
       border: '0.5px solid rgba(0,0,0,0.06)',
-    }}>
-      {nombre?.[0]?.toUpperCase()}
-    </div>
+    }}>{nombre?.[0]?.toUpperCase()}</div>
   )
 }
 
@@ -89,7 +87,7 @@ export default function VistaCliente({ token }) {
           i.ig_usuario, i.ig_seguidores, i.ig_link,
           i.tt_usuario, i.tt_seguidores, i.tt_link,
           i.tipos_contenido, i.avatar_url,
-          ci.video_link
+          ci.video_link_tt, ci.video_link_ig
         FROM campaigns c
         JOIN campaign_influencers ci ON ci.campaign_id = c.id
         JOIN influencers i ON i.id = ci.influencer_id
@@ -133,12 +131,15 @@ export default function VistaCliente({ token }) {
   const plat = camp.plataforma || 'Ambas'
   const showIG = plat === 'Ambas' || plat === 'Instagram'
   const showTT = plat === 'Ambas' || plat === 'TikTok'
+  const showBoth = plat === 'Ambas'
 
   const totalIG = camp.influencers.reduce((s, i) => s + Number(i.ig_seguidores), 0)
   const totalTT = camp.influencers.reduce((s, i) => s + Number(i.tt_seguidores), 0)
   const totalSeg = (showIG ? totalIG : 0) + (showTT ? totalTT : 0)
 
-  const hasVideos = camp.influencers.some(i => i.video_link)
+  const hasVideoTT = showTT && camp.influencers.some(i => i.video_link_tt)
+  const hasVideoIG = showIG && camp.influencers.some(i => i.video_link_ig)
+  const hasAnyVideo = hasVideoTT || hasVideoIG
 
   return (
     <div style={{ minHeight: '100vh', background: '#F7F7F5', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
@@ -173,7 +174,7 @@ export default function VistaCliente({ token }) {
               <div style={{ fontSize: 20, fontWeight: 500, color: '#fff' }}>{fmtSeg(totalTT)}</div>
             </div>
           )}
-          {plat === 'Ambas' && (
+          {showBoth && (
             <div>
               <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 4 }}>Alcance total</div>
               <div style={{ fontSize: 20, fontWeight: 500, color: '#fff' }}>{fmtSeg(totalSeg)}</div>
@@ -189,11 +190,12 @@ export default function VistaCliente({ token }) {
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ background: '#F7F7F5', borderBottom: '0.5px solid #E5E5E2' }}>
-                  <th style={{ padding: '11px 16px', textAlign: 'left', fontSize: 10.5, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '.08em', color: '#AAA', width: 200 }}>Influencer</th>
-                  {showIG && <th style={{ padding: '11px 16px', textAlign: 'left', fontSize: 10.5, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '.08em', color: '#AAA', width: 160 }}>Instagram</th>}
-                  {showTT && <th style={{ padding: '11px 16px', textAlign: 'left', fontSize: 10.5, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '.08em', color: '#AAA', width: 160 }}>TikTok</th>}
-                  <th style={{ padding: '11px 16px', textAlign: 'left', fontSize: 10.5, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '.08em', color: '#AAA', width: 160 }}>Categorías</th>
-                  {hasVideos && <th style={{ padding: '11px 16px', textAlign: 'left', fontSize: 10.5, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '.08em', color: '#AAA', width: 80 }}>Video</th>}
+                  <th style={{ padding: '11px 16px', textAlign: 'left', fontSize: 10.5, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '.08em', color: '#AAA', minWidth: 180 }}>Influencer</th>
+                  {showIG && <th style={{ padding: '11px 16px', textAlign: 'left', fontSize: 10.5, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '.08em', color: '#AAA', minWidth: 150 }}>Instagram</th>}
+                  {showTT && <th style={{ padding: '11px 16px', textAlign: 'left', fontSize: 10.5, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '.08em', color: '#AAA', minWidth: 150 }}>TikTok</th>}
+                  <th style={{ padding: '11px 16px', textAlign: 'left', fontSize: 10.5, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '.08em', color: '#AAA', minWidth: 150 }}>Categorías</th>
+                  {hasVideoIG && <th style={{ padding: '11px 16px', textAlign: 'left', fontSize: 10.5, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '.08em', color: '#AAA', minWidth: 80 }}>Post IG</th>}
+                  {hasVideoTT && <th style={{ padding: '11px 16px', textAlign: 'left', fontSize: 10.5, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '.08em', color: '#AAA', minWidth: 80 }}>Video TT</th>}
                 </tr>
               </thead>
               <tbody>
@@ -240,17 +242,26 @@ export default function VistaCliente({ token }) {
                           {tipos.length === 0 && <span style={{ color: '#CCC', fontSize: 12 }}>—</span>}
                         </div>
                       </td>
-                      {hasVideos && (
+                      {hasVideoIG && (
                         <td style={{ padding: '13px 16px', verticalAlign: 'middle' }}>
-                          {inf.video_link ? (
-                            <a href={inf.video_link} target="_blank" rel="noopener noreferrer"
-                              style={{ color: '#E8313A', fontSize: 13, textDecoration: 'none', fontWeight: 500 }}
+                          {inf.video_link_ig ? (
+                            <a href={inf.video_link_ig} target="_blank" rel="noopener noreferrer"
+                              style={{ color: '#C2185B', fontSize: 13, textDecoration: 'none', fontWeight: 500 }}
                               onMouseEnter={e => e.currentTarget.style.textDecoration = 'underline'}
                               onMouseLeave={e => e.currentTarget.style.textDecoration = 'none'}
                             >Ver ↗</a>
-                          ) : (
-                            <span style={{ color: '#CCC', fontSize: 12 }}>—</span>
-                          )}
+                          ) : <span style={{ color: '#CCC', fontSize: 12 }}>—</span>}
+                        </td>
+                      )}
+                      {hasVideoTT && (
+                        <td style={{ padding: '13px 16px', verticalAlign: 'middle' }}>
+                          {inf.video_link_tt ? (
+                            <a href={inf.video_link_tt} target="_blank" rel="noopener noreferrer"
+                              style={{ color: '#1A1A1A', fontSize: 13, textDecoration: 'none', fontWeight: 500 }}
+                              onMouseEnter={e => e.currentTarget.style.textDecoration = 'underline'}
+                              onMouseLeave={e => e.currentTarget.style.textDecoration = 'none'}
+                            >Ver ↗</a>
+                          ) : <span style={{ color: '#CCC', fontSize: 12 }}>—</span>}
                         </td>
                       )}
                     </tr>
@@ -260,7 +271,7 @@ export default function VistaCliente({ token }) {
             </table>
           </div>
 
-          {/* Footer */}
+          {/* Footer totales */}
           <div style={{ padding: '14px 16px', background: '#F7F7F5', borderTop: '0.5px solid #E5E5E2', display: 'flex', justifyContent: 'flex-end', gap: 24 }}>
             <div style={{ textAlign: 'right' }}>
               <div style={{ fontSize: 10.5, color: '#AAA', textTransform: 'uppercase', letterSpacing: '.07em' }}>Total influencers</div>
@@ -278,7 +289,7 @@ export default function VistaCliente({ token }) {
                 <div style={{ fontSize: 16, fontWeight: 500 }}>{fmtSeg(totalTT)}</div>
               </div>
             )}
-            {plat === 'Ambas' && (
+            {showBoth && (
               <div style={{ textAlign: 'right' }}>
                 <div style={{ fontSize: 10.5, color: '#AAA', textTransform: 'uppercase', letterSpacing: '.07em' }}>Alcance total</div>
                 <div style={{ fontSize: 16, fontWeight: 500 }}>{fmtSeg(totalSeg)}</div>
