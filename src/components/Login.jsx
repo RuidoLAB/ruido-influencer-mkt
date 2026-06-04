@@ -45,7 +45,7 @@ export default function Login({ onLogin }) {
           </div>
         </div>
 
-        <h1 style={{ fontSize: 18, fontWeight: 500, marginBottom: 6 }}>Bienvenida</h1>
+        <h1 style={{ fontSize: 18, fontWeight: 500, marginBottom: 6 }}>Bienvenido</h1>
         <p style={{ fontSize: 13, color: '#AAA', marginBottom: 24 }}>Ingresa la contraseña para acceder.</p>
 
         <form onSubmit={handleSubmit}>
