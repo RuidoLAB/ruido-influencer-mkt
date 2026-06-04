@@ -35,6 +35,15 @@ const AV_COLORS = [
   { bg: '#E8F5E9', color: '#2E7D32' },
 ]
 
+const ESTADO_CAMP_COLORS = {
+  Activa:    { bg: '#EAF3DE', color: '#27500A' },
+  Pausada:   { bg: '#FAEEDA', color: '#633806' },
+  Cerrada:   { bg: '#E6F1FB', color: '#0C447C' },
+  Cancelada: { bg: '#FCEBEB', color: '#791F1F' },
+}
+
+const TABS = ['Activas', 'Pausadas', 'Cerradas', 'Canceladas', 'Todas']
+
 function fmtSeg(n) {
   n = Number(n)
   if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M'
@@ -136,6 +145,7 @@ export default function Campanas() {
   const [loading, setLoading] = useState(true)
   const [currentCamp, setCurrentCamp] = useState(null)
   const [roster, setRoster] = useState([])
+  const [tab, setTab] = useState('Activas')
 
   const [modalNewCamp, setModalNewCamp] = useState(false)
   const [campForm, setCampForm] = useState(EMPTY_CAMP)
@@ -153,6 +163,7 @@ export default function Campanas() {
 
   const [deleteCampId, setDeleteCampId] = useState(null)
   const [deleteCI, setDeleteCI] = useState(null)
+  const [changeEstadoModal, setChangeEstadoModal] = useState(false)
 
   useEffect(() => { fetchCamps(); fetchRoster() }, [])
 
@@ -240,6 +251,14 @@ export default function Campanas() {
     setSavingCamp(false)
   }
 
+  async function updateEstado(id, estado) {
+    try {
+      await sql`UPDATE campaigns SET estado = ${estado} WHERE id = ${id}`
+      setChangeEstadoModal(false)
+      await fetchCamps()
+    } catch (e) { console.error(e) }
+  }
+
   async function deleteCamp(id) {
     try {
       await sql`DELETE FROM campaigns WHERE id = ${id}`
@@ -315,12 +334,24 @@ export default function Campanas() {
       inf.tt_usuario.toLowerCase().includes(infSearch.toLowerCase()))
   )
 
+  const filteredCamps = camps.filter(c => {
+    if (tab === 'Todas') return true
+    if (tab === 'Activas') return c.estado === 'Activa'
+    if (tab === 'Pausadas') return c.estado === 'Pausada'
+    if (tab === 'Cerradas') return c.estado === 'Cerrada'
+    if (tab === 'Canceladas') return c.estado === 'Cancelada'
+    return true
+  })
+
+  const isReadOnly = currentCamp && (currentCamp.estado === 'Cerrada' || currentCamp.estado === 'Cancelada')
+
   if (loading) return <div style={{ padding: 40, color: '#AAA', fontSize: 13 }}>Cargando...</div>
 
   if (currentCamp) {
+    const ec = ESTADO_CAMP_COLORS[currentCamp.estado] || ESTADO_CAMP_COLORS['Activa']
     return (
       <div style={{ padding: '20px 24px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20 }}>
           <div>
             <div
               style={{ fontSize: 12, color: '#AAA', cursor: 'pointer', marginBottom: 4, display: 'inline-flex', alignItems: 'center', gap: 4 }}
@@ -328,11 +359,35 @@ export default function Campanas() {
             >
               ← Volver a campañas
             </div>
-            <h1 style={{ fontSize: 20, fontWeight: 500 }}>{currentCamp.nombre}</h1>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <h1 style={{ fontSize: 20, fontWeight: 500 }}>{currentCamp.nombre}</h1>
+              <span style={{ fontSize: 11, padding: '2px 9px', borderRadius: 20, background: ec.bg, color: ec.color }}>
+                {currentCamp.estado}
+              </span>
+            </div>
             <p style={{ fontSize: 12, color: '#888', marginTop: 2 }}>{currentCamp.cliente} · {currentCamp.moneda}</p>
           </div>
-          <button className="btn-red" onClick={openAddInf}>+ Agregar influencer</button>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button className="btn-ghost" onClick={() => setChangeEstadoModal(true)}>
+              Cambiar estado
+            </button>
+            {!isReadOnly && (
+              <button className="btn-red" onClick={openAddInf}>+ Agregar influencer</button>
+            )}
+          </div>
         </div>
+
+        {isReadOnly && (
+          <div style={{
+            background: currentCamp.estado === 'Cancelada' ? '#FCEBEB' : '#E6F1FB',
+            border: `0.5px solid ${currentCamp.estado === 'Cancelada' ? '#F7C1C1' : '#B5D4F4'}`,
+            borderRadius: 10, padding: '10px 14px', marginBottom: 20,
+            fontSize: 13,
+            color: currentCamp.estado === 'Cancelada' ? '#791F1F' : '#0C447C',
+          }}>
+            Campaña {currentCamp.estado.toLowerCase()} — modo lectura. No se pueden agregar ni editar influencers.
+          </div>
+        )}
 
         <BudgetSummary camp={currentCamp} />
         <SharePanel camp={currentCamp} onUpdate={fetchCamps} />
@@ -345,7 +400,7 @@ export default function Campanas() {
         <div className="card" style={{ overflow: 'hidden' }}>
           {currentCamp.influencers.length === 0 ? (
             <div style={{ padding: 40, textAlign: 'center', color: '#AAA', fontSize: 13 }}>
-              Aún no hay influencers en esta campaña. Agrega desde el roster.
+              No hay influencers en esta campaña.
             </div>
           ) : (
             <div style={{ overflowX: 'auto' }}>
@@ -358,7 +413,7 @@ export default function Campanas() {
                     <th className="th" style={{ width: 100 }}>Costo</th>
                     <th className="th" style={{ width: 60 }}>Piezas</th>
                     <th className="th" style={{ width: 130 }}>Estado</th>
-                    <th className="th" style={{ width: 70 }}>Acciones</th>
+                    {!isReadOnly && <th className="th" style={{ width: 70 }}>Acciones</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -390,12 +445,14 @@ export default function Campanas() {
                             {inf.ci_estado}
                           </span>
                         </td>
-                        <td className="td">
-                          <div style={{ display: 'flex', gap: 4 }}>
-                            <button className="btn-icon" onClick={() => openEditCI(inf)} title="Editar">✎</button>
-                            <button className="btn-icon btn-icon-danger" onClick={() => setDeleteCI(inf.ci_id)} title="Quitar">✕</button>
-                          </div>
-                        </td>
+                        {!isReadOnly && (
+                          <td className="td">
+                            <div style={{ display: 'flex', gap: 4 }}>
+                              <button className="btn-icon" onClick={() => openEditCI(inf)} title="Editar">✎</button>
+                              <button className="btn-icon btn-icon-danger" onClick={() => setDeleteCI(inf.ci_id)} title="Quitar">✕</button>
+                            </div>
+                          </td>
+                        )}
                       </tr>
                     )
                   })}
@@ -405,6 +462,39 @@ export default function Campanas() {
           )}
         </div>
 
+        {/* Modal cambiar estado campaña */}
+        <Modal open={changeEstadoModal} onClose={() => setChangeEstadoModal(false)} title="Cambiar estado de campaña">
+          <p style={{ fontSize: 13, color: '#888', marginBottom: 16 }}>Estado actual: <strong>{currentCamp.estado}</strong></p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
+            {['Activa', 'Pausada', 'Cerrada', 'Cancelada'].filter(e => e !== currentCamp.estado).map(estado => {
+              const ec = ESTADO_CAMP_COLORS[estado]
+              return (
+                <button
+                  key={estado}
+                  onClick={() => updateEstado(currentCamp.id, estado)}
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    padding: '10px 14px', borderRadius: 8, cursor: 'pointer',
+                    border: `0.5px solid ${ec.bg}`, background: '#fff',
+                    fontSize: 13, fontFamily: 'inherit', transition: 'all .12s',
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = ec.bg}
+                  onMouseLeave={e => e.currentTarget.style.background = '#fff'}
+                >
+                  <span>{estado}</span>
+                  <span style={{ fontSize: 11, background: ec.bg, color: ec.color, padding: '2px 9px', borderRadius: 20 }}>
+                    {estado === 'Activa' ? 'En curso' : estado === 'Pausada' ? 'Pausa temporal' : estado === 'Cerrada' ? 'Finalizada' : 'No ejecutada'}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <button className="btn-ghost" onClick={() => setChangeEstadoModal(false)}>Cancelar</button>
+          </div>
+        </Modal>
+
+        {/* Modal agregar influencer */}
         <Modal open={modalAddInf} onClose={() => setModalAddInf(false)} title="Agregar influencer">
           <div className="fg">
             <label className="label">Buscar en roster</label>
@@ -424,7 +514,6 @@ export default function Campanas() {
                   padding: '9px 12px', cursor: 'pointer',
                   borderBottom: '0.5px solid #F0F0EE',
                   background: selInf?.id === inf.id ? '#FCEBEB' : 'transparent',
-                  transition: 'background .1s',
                 }}
               >
                 <div style={{
@@ -526,36 +615,77 @@ export default function Campanas() {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
         <div>
           <h1 style={{ fontSize: 20, fontWeight: 500 }}>Campañas</h1>
-          <p style={{ fontSize: 12, color: '#888', marginTop: 2 }}>{camps.length} campañas</p>
+          <p style={{ fontSize: 12, color: '#888', marginTop: 2 }}>{camps.length} campañas en total</p>
         </div>
         <button className="btn-red" onClick={() => { setCampForm(EMPTY_CAMP); setModalNewCamp(true) }}>+ Nueva campaña</button>
       </div>
 
-      {camps.length === 0 ? (
+      {/* Tabs */}
+      <div style={{ display: 'flex', gap: 2, background: '#F0F0EE', borderRadius: 10, padding: 3, marginBottom: 20, width: 'fit-content', border: '0.5px solid #E5E5E2' }}>
+        {TABS.map(t => {
+          const count = t === 'Todas' ? camps.length : camps.filter(c => c.estado === t.slice(0, -1)).length
+          return (
+            <div
+              key={t}
+              onClick={() => setTab(t)}
+              style={{
+                padding: '6px 14px', borderRadius: 8, cursor: 'pointer',
+                fontSize: 12.5, transition: 'all .12s', display: 'flex', alignItems: 'center', gap: 5,
+                background: tab === t ? '#fff' : 'transparent',
+                color: tab === t ? '#1A1A1A' : '#888',
+                boxShadow: tab === t ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                border: tab === t ? '0.5px solid #E5E5E2' : '0.5px solid transparent',
+              }}
+            >
+              {t}
+              {count > 0 && (
+                <span style={{
+                  fontSize: 10, padding: '0px 5px', borderRadius: 20,
+                  background: tab === t ? '#F0F0EE' : 'transparent',
+                  color: '#AAA',
+                }}>
+                  {count}
+                </span>
+              )}
+            </div>
+          )
+        })}
+      </div>
+
+      {filteredCamps.length === 0 ? (
         <div style={{ padding: 60, textAlign: 'center', color: '#AAA', fontSize: 13 }}>
-          Aún no hay campañas. Crea la primera.
+          No hay campañas {tab !== 'Todas' ? tab.toLowerCase() : ''}.
         </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 14 }}>
-          {camps.map(camp => {
+          {filteredCamps.map(camp => {
             const usado = camp.influencers.reduce((s, i) => s + Number(i.costo), 0)
+            const ec = ESTADO_CAMP_COLORS[camp.estado] || ESTADO_CAMP_COLORS['Activa']
+            const isInactive = camp.estado === 'Cerrada' || camp.estado === 'Cancelada'
             return (
               <div
                 key={camp.id}
                 className="card"
-                style={{ padding: 18, cursor: 'pointer', transition: 'border-color .15s', position: 'relative' }}
+                style={{
+                  padding: 18, cursor: 'pointer', transition: 'border-color .15s',
+                  position: 'relative', opacity: isInactive ? 0.75 : 1,
+                }}
                 onClick={() => setCurrentCamp(camp)}
                 onMouseEnter={e => e.currentTarget.style.borderColor = '#E8313A'}
                 onMouseLeave={e => e.currentTarget.style.borderColor = '#E5E5E2'}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 2 }}>
                   <div style={{ fontSize: 14, fontWeight: 500, flex: 1, paddingRight: 8 }}>{camp.nombre}</div>
-                  <button
-                    className="btn-icon btn-icon-danger"
-                    style={{ flexShrink: 0 }}
-                    onClick={e => { e.stopPropagation(); setDeleteCampId(camp.id) }}
-                    title="Eliminar campaña"
-                  >✕</button>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                    <span style={{ fontSize: 10.5, padding: '1px 7px', borderRadius: 20, background: ec.bg, color: ec.color }}>
+                      {camp.estado}
+                    </span>
+                    <button
+                      className="btn-icon btn-icon-danger"
+                      onClick={e => { e.stopPropagation(); setDeleteCampId(camp.id) }}
+                      title="Eliminar campaña"
+                    >✕</button>
+                  </div>
                 </div>
                 <div style={{ fontSize: 12, color: '#888', marginBottom: 12 }}>{camp.cliente}</div>
                 <div style={{ display: 'flex', gap: 14, marginBottom: 4 }}>
