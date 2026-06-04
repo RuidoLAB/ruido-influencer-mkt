@@ -46,13 +46,29 @@ function Avatar({ nombre, index, size = 32 }) {
   )
 }
 
+function UserLink({ username, link }) {
+  if (!username) return <span style={{ color: '#CCC' }}>—</span>
+  if (link) return (
+    <a
+      href={link}
+      target="_blank"
+      rel="noopener noreferrer"
+      style={{ color: '#E8313A', textDecoration: 'none', fontSize: 12.5 }}
+      onMouseEnter={e => e.target.style.textDecoration = 'underline'}
+      onMouseLeave={e => e.target.style.textDecoration = 'none'}
+    >
+      {username} ↗
+    </a>
+  )
+  return <span style={{ fontSize: 12.5, color: '#555' }}>{username}</span>
+}
+
 function TipoBadge({ tipo }) {
   const c = TIPO_COLORS[tipo] || TIPO_COLORS['Otros']
   return (
     <span style={{
       background: c.bg, color: c.color,
-      padding: '2px 9px', borderRadius: 20,
-      fontSize: 11, fontWeight: 400,
+      padding: '2px 9px', borderRadius: 20, fontSize: 11,
     }}>
       {tipo}
     </span>
@@ -60,8 +76,8 @@ function TipoBadge({ tipo }) {
 }
 
 const EMPTY = {
-  nombre: '', ig_usuario: '', ig_seguidores: '',
-  tt_usuario: '', tt_seguidores: '',
+  nombre: '', ig_usuario: '', ig_seguidores: '', ig_link: '',
+  tt_usuario: '', tt_seguidores: '', tt_link: '',
   tipo_contenido: 'Lifestyle', estado: 'Activo', notas: '',
 }
 
@@ -89,9 +105,7 @@ export default function Roster() {
         ORDER BY (ig_seguidores + tt_seguidores) DESC
       `
       setInfluencers(data)
-    } catch (e) {
-      console.error(e)
-    }
+    } catch (e) { console.error(e) }
     setLoading(false)
   }
 
@@ -104,10 +118,12 @@ export default function Roster() {
   function openEdit(inf) {
     setForm({
       nombre: inf.nombre,
-      ig_usuario: inf.ig_usuario,
+      ig_usuario: inf.ig_usuario || '',
       ig_seguidores: inf.ig_seguidores,
-      tt_usuario: inf.tt_usuario,
+      ig_link: inf.ig_link || '',
+      tt_usuario: inf.tt_usuario || '',
       tt_seguidores: inf.tt_seguidores,
+      tt_link: inf.tt_link || '',
       tipo_contenido: inf.tipo_contenido,
       estado: inf.estado,
       notas: inf.notas || '',
@@ -128,8 +144,10 @@ export default function Roster() {
             nombre = ${form.nombre},
             ig_usuario = ${form.ig_usuario},
             ig_seguidores = ${ig_seg},
+            ig_link = ${form.ig_link},
             tt_usuario = ${form.tt_usuario},
             tt_seguidores = ${tt_seg},
+            tt_link = ${form.tt_link},
             tipo_contenido = ${form.tipo_contenido},
             estado = ${form.estado},
             notas = ${form.notas}
@@ -137,15 +155,13 @@ export default function Roster() {
         `
       } else {
         await sql`
-          INSERT INTO influencers (nombre, ig_usuario, ig_seguidores, tt_usuario, tt_seguidores, tipo_contenido, estado, notas)
-          VALUES (${form.nombre}, ${form.ig_usuario}, ${ig_seg}, ${form.tt_usuario}, ${tt_seg}, ${form.tipo_contenido}, ${form.estado}, ${form.notas})
+          INSERT INTO influencers (nombre, ig_usuario, ig_seguidores, ig_link, tt_usuario, tt_seguidores, tt_link, tipo_contenido, estado, notas)
+          VALUES (${form.nombre}, ${form.ig_usuario}, ${ig_seg}, ${form.ig_link}, ${form.tt_usuario}, ${tt_seg}, ${form.tt_link}, ${form.tipo_contenido}, ${form.estado}, ${form.notas})
         `
       }
       setModalOpen(false)
       await fetchInfluencers()
-    } catch (e) {
-      console.error(e)
-    }
+    } catch (e) { console.error(e) }
     setSaving(false)
   }
 
@@ -154,17 +170,15 @@ export default function Roster() {
       await sql`DELETE FROM influencers WHERE id = ${id}`
       setDeleteId(null)
       await fetchInfluencers()
-    } catch (e) {
-      console.error(e)
-    }
+    } catch (e) { console.error(e) }
   }
 
   const filtered = influencers
     .filter(i => {
       const q = search.toLowerCase()
       const matchSearch = !q || i.nombre.toLowerCase().includes(q) ||
-        i.ig_usuario.toLowerCase().includes(q) ||
-        i.tt_usuario.toLowerCase().includes(q)
+        (i.ig_usuario || '').toLowerCase().includes(q) ||
+        (i.tt_usuario || '').toLowerCase().includes(q)
       const matchTipo = !filterTipo || i.tipo_contenido === filterTipo
       const matchEstado = !filterEstado || i.estado === filterEstado
       return matchSearch && matchTipo && matchEstado
@@ -176,8 +190,6 @@ export default function Roster() {
 
   return (
     <div style={{ padding: '20px 24px' }}>
-
-      {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
         <div>
           <h1 style={{ fontSize: 20, fontWeight: 500 }}>Roster</h1>
@@ -188,7 +200,6 @@ export default function Roster() {
         <button className="btn-red" onClick={openNew}>+ Nuevo influencer</button>
       </div>
 
-      {/* Toolbar */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
         <input
           className="input"
@@ -208,12 +219,11 @@ export default function Roster() {
         </select>
       </div>
 
-      {/* Tabla */}
       <div className="card" style={{ overflow: 'hidden' }}>
         {loading ? (
-          <div style={{ padding: 40, textAlign: 'center', color: '#aaa', fontSize: 13 }}>Cargando...</div>
+          <div style={{ padding: 40, textAlign: 'center', color: '#AAA', fontSize: 13 }}>Cargando...</div>
         ) : filtered.length === 0 ? (
-          <div style={{ padding: 40, textAlign: 'center', color: '#aaa', fontSize: 13 }}>
+          <div style={{ padding: 40, textAlign: 'center', color: '#AAA', fontSize: 13 }}>
             {search || filterTipo || filterEstado ? 'Sin resultados para ese filtro' : 'Aún no hay influencers. Agrega el primero.'}
           </div>
         ) : (
@@ -222,13 +232,9 @@ export default function Roster() {
               <thead>
                 <tr style={{ background: '#F7F7F5', borderBottom: '0.5px solid #E5E5E2' }}>
                   <th className="th" style={{ width: 220 }}>Influencer</th>
-                  <th className="th" style={{ width: 140 }}>Instagram</th>
-                  <th className="th" style={{ width: 140 }}>TikTok</th>
-                  <th
-                    className="th"
-                    style={{ width: 110, cursor: 'pointer', userSelect: 'none' }}
-                    onClick={() => setSortAsc(s => !s)}
-                  >
+                  <th className="th" style={{ width: 150 }}>Instagram</th>
+                  <th className="th" style={{ width: 150 }}>TikTok</th>
+                  <th className="th" style={{ width: 110, cursor: 'pointer', userSelect: 'none' }} onClick={() => setSortAsc(s => !s)}>
                     Total seg. {sortAsc ? '↑' : '↓'}
                   </th>
                   <th className="th" style={{ width: 100 }}>Tipo</th>
@@ -246,11 +252,11 @@ export default function Roster() {
                       </div>
                     </td>
                     <td className="td">
-                      <div style={{ fontSize: 12.5, color: '#555' }}>{inf.ig_usuario || '—'}</div>
+                      <UserLink username={inf.ig_usuario} link={inf.ig_link} />
                       <div style={{ fontSize: 11, color: '#AAA' }}>{inf.ig_seguidores ? fmtSeg(inf.ig_seguidores) : ''}</div>
                     </td>
                     <td className="td">
-                      <div style={{ fontSize: 12.5, color: '#555' }}>{inf.tt_usuario || '—'}</div>
+                      <UserLink username={inf.tt_usuario} link={inf.tt_link} />
                       <div style={{ fontSize: 11, color: '#AAA' }}>{inf.tt_seguidores ? fmtSeg(inf.tt_seguidores) : ''}</div>
                     </td>
                     <td className="td">
@@ -280,17 +286,10 @@ export default function Roster() {
         )}
       </div>
 
-      {/* Modal crear/editar */}
-      <Modal
-        open={modalOpen}
-        onClose={() => setModalOpen(false)}
-        title={editId ? 'Editar influencer' : 'Nuevo influencer'}
-      >
-        <div className="form-row">
-          <div className="fg">
-            <label className="label">Nombre</label>
-            <input className="input" value={form.nombre} onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))} placeholder="Nombre completo" />
-          </div>
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editId ? 'Editar influencer' : 'Nuevo influencer'}>
+        <div className="fg">
+          <label className="label">Nombre</label>
+          <input className="input" value={form.nombre} onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))} placeholder="Nombre completo" />
         </div>
         <div className="form-row-2">
           <div className="fg">
@@ -302,6 +301,10 @@ export default function Roster() {
             <input className="input" type="number" value={form.ig_seguidores} onChange={e => setForm(f => ({ ...f, ig_seguidores: e.target.value }))} placeholder="0" />
           </div>
         </div>
+        <div className="fg">
+          <label className="label">Link Instagram</label>
+          <input className="input" value={form.ig_link} onChange={e => setForm(f => ({ ...f, ig_link: e.target.value }))} placeholder="https://instagram.com/usuario" />
+        </div>
         <div className="form-row-2">
           <div className="fg">
             <label className="label">Usuario TikTok</label>
@@ -311,6 +314,10 @@ export default function Roster() {
             <label className="label">Seguidores TikTok</label>
             <input className="input" type="number" value={form.tt_seguidores} onChange={e => setForm(f => ({ ...f, tt_seguidores: e.target.value }))} placeholder="0" />
           </div>
+        </div>
+        <div className="fg">
+          <label className="label">Link TikTok</label>
+          <input className="input" value={form.tt_link} onChange={e => setForm(f => ({ ...f, tt_link: e.target.value }))} placeholder="https://tiktok.com/@usuario" />
         </div>
         <div className="form-row-2">
           <div className="fg">
@@ -339,7 +346,6 @@ export default function Roster() {
         </div>
       </Modal>
 
-      {/* Modal confirmar eliminar */}
       <Modal open={!!deleteId} onClose={() => setDeleteId(null)} title="Eliminar influencer">
         <p style={{ fontSize: 13, color: '#555', marginBottom: 20 }}>
           ¿Estás segura? Esta acción no se puede deshacer.
@@ -349,7 +355,6 @@ export default function Roster() {
           <button className="btn-danger" onClick={() => handleDelete(deleteId)}>Eliminar</button>
         </div>
       </Modal>
-
     </div>
   )
 }
