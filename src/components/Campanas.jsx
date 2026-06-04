@@ -3,25 +3,50 @@ import sql from '../lib/db'
 import Modal from './Modal'
 import SharePanel from './SharePanel'
 
+const TIPOS = ['Bailes', 'Reviewers', 'Humor', 'Lifestyle', 'Música', 'Gaming', 'Moda', 'Fitness', 'Viajes', 'Otros']
+
+const TIPO_COLORS = {
+  Bailes:    { bg: '#EEEDFE', color: '#3C3489' },
+  Reviewers: { bg: '#E6F1FB', color: '#0C447C' },
+  Humor:     { bg: '#FAEEDA', color: '#633806' },
+  Lifestyle: { bg: '#E1F5EE', color: '#085041' },
+  Música:    { bg: '#FAECE7', color: '#712B13' },
+  Gaming:    { bg: '#FBEAF0', color: '#72243E' },
+  Moda:      { bg: '#FEF0FB', color: '#6B1560' },
+  Fitness:   { bg: '#E8F5E9', color: '#1B5E20' },
+  Viajes:    { bg: '#E3F2FD', color: '#0D47A1' },
+  Otros:     { bg: '#F1EFE8', color: '#444441' },
+}
+
+const SIZE_RANGES = [
+  { label: 'Nano',  min: 0,       max: 10000,    bg: '#F1EFE8', color: '#5F5E5A' },
+  { label: 'Micro', min: 10000,   max: 150000,   bg: '#E6F1FB', color: '#0C447C' },
+  { label: 'Mid',   min: 150000,  max: 750000,   bg: '#EEEDFE', color: '#3C3489' },
+  { label: 'Macro', min: 750000,  max: 4000000,  bg: '#EAF3DE', color: '#27500A' },
+  { label: 'Mega',  min: 4000000, max: Infinity, bg: '#FAEEDA', color: '#633806' },
+]
+
+function getSize(n) {
+  n = Number(n)
+  return SIZE_RANGES.find(r => n >= r.min && n < r.max) || SIZE_RANGES[0]
+}
+
 const ESTADOS_INF = ['Contactado', 'Negociando', 'Confirmado', 'Brief enviado', 'Contenido recibido', 'Publicado']
 
 const ESTADO_INF_COLORS = {
-  Contactado: { bg: '#F1EFE8', color: '#5F5E5A' },
-  Negociando: { bg: '#FAEEDA', color: '#633806' },
-  Confirmado: { bg: '#E1F5EE', color: '#085041' },
-  'Brief enviado': { bg: '#E6F1FB', color: '#0C447C' },
-  'Contenido recibido': { bg: '#EEEDFE', color: '#3C3489' },
-  Publicado: { bg: '#EAF3DE', color: '#27500A' },
+  Contactado:          { bg: '#F1EFE8', color: '#5F5E5A' },
+  Negociando:          { bg: '#FAEEDA', color: '#633806' },
+  Confirmado:          { bg: '#E1F5EE', color: '#085041' },
+  'Brief enviado':     { bg: '#E6F1FB', color: '#0C447C' },
+  'Contenido recibido':{ bg: '#EEEDFE', color: '#3C3489' },
+  Publicado:           { bg: '#EAF3DE', color: '#27500A' },
 }
 
-const TIPO_COLORS = {
-  Bailes: { bg: '#EEEDFE', color: '#3C3489' },
-  Reviewers: { bg: '#E6F1FB', color: '#0C447C' },
-  Humor: { bg: '#FAEEDA', color: '#633806' },
-  Lifestyle: { bg: '#E1F5EE', color: '#085041' },
-  Música: { bg: '#FAECE7', color: '#712B13' },
-  Gaming: { bg: '#FBEAF0', color: '#72243E' },
-  Otros: { bg: '#F1EFE8', color: '#444441' },
+const ESTADO_CAMP_COLORS = {
+  Activa:    { bg: '#EAF3DE', color: '#27500A' },
+  Pausada:   { bg: '#FAEEDA', color: '#633806' },
+  Cerrada:   { bg: '#E6F1FB', color: '#0C447C' },
+  Cancelada: { bg: '#FCEBEB', color: '#791F1F' },
 }
 
 const AV_COLORS = [
@@ -35,14 +60,8 @@ const AV_COLORS = [
   { bg: '#E8F5E9', color: '#2E7D32' },
 ]
 
-const ESTADO_CAMP_COLORS = {
-  Activa:    { bg: '#EAF3DE', color: '#27500A' },
-  Pausada:   { bg: '#FAEEDA', color: '#633806' },
-  Cerrada:   { bg: '#E6F1FB', color: '#0C447C' },
-  Cancelada: { bg: '#FCEBEB', color: '#791F1F' },
-}
-
 const TABS = ['Activas', 'Pausadas', 'Cerradas', 'Canceladas', 'Todas']
+const PLATAFORMAS = ['Ambas', 'TikTok', 'Instagram']
 
 function fmtSeg(n) {
   n = Number(n)
@@ -66,9 +85,7 @@ function Avatar({ nombre, index, size = 30 }) {
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       fontSize: size * 0.38, fontWeight: 500, flexShrink: 0,
       border: '0.5px solid rgba(0,0,0,0.06)',
-    }}>
-      {nombre?.[0]?.toUpperCase()}
-    </div>
+    }}>{nombre?.[0]?.toUpperCase()}</div>
   )
 }
 
@@ -78,10 +95,10 @@ function BudgetBar({ usado, total }) {
   return (
     <div style={{ marginTop: 10 }}>
       <div style={{ height: 4, background: '#F0F0EE', borderRadius: 2, overflow: 'hidden' }}>
-        <div style={{ height: '100%', width: pct + '%', background: color, borderRadius: 2, transition: 'width .3s' }} />
+        <div style={{ height: '100%', width: pct + '%', background: color, borderRadius: 2 }} />
       </div>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 3, fontSize: 10.5, color: '#AAA' }}>
-        <span style={{ color }}>{pct}% utilizado</span>
+        <span style={{ color }}>{pct}%</span>
         <span>{fmtMoney(total, 'CLP')}</span>
       </div>
     </div>
@@ -95,7 +112,6 @@ function BudgetSummary({ camp }) {
   const statusColor = pct >= 100 ? '#A32D2D' : pct >= 90 ? '#854F0B' : '#3B6D11'
   const statusBg = pct >= 100 ? '#FCEBEB' : pct >= 90 ? '#FAEEDA' : '#EAF3DE'
   const barColor = pct >= 100 ? '#E24B4A' : pct >= 90 ? '#EF9F27' : '#639922'
-
   return (
     <div style={{
       display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12,
@@ -116,29 +132,31 @@ function BudgetSummary({ camp }) {
         <div style={{ fontSize: 10.5, color: '#AAA', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 4 }}>Restante</div>
         <div style={{ fontSize: 20, fontWeight: 500, color: statusColor }}>{fmtMoney(restante, camp.moneda)}</div>
         <div style={{ fontSize: 11, marginTop: 2 }}>
-          <span style={{ background: statusBg, color: statusColor, padding: '1px 7px', borderRadius: 20 }}>
-            {pct}% usado
-          </span>
+          <span style={{ background: statusBg, color: statusColor, padding: '1px 7px', borderRadius: 20 }}>{pct}% usado</span>
         </div>
       </div>
       <div>
         <div style={{ fontSize: 10.5, color: '#AAA', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 4 }}>Alcance total</div>
         <div style={{ fontSize: 20, fontWeight: 500 }}>
-          {fmtSeg(camp.influencers?.reduce((s, i) => s + Number(i.ig_seguidores || 0) + Number(i.tt_seguidores || 0), 0) || 0)}
+          {fmtSeg(camp.influencers?.reduce((s, i) => {
+            const ig = camp.plataforma !== 'TikTok' ? Number(i.ig_seguidores || 0) : 0
+            const tt = camp.plataforma !== 'Instagram' ? Number(i.tt_seguidores || 0) : 0
+            return s + ig + tt
+          }, 0) || 0)}
         </div>
-        <div style={{ fontSize: 11, color: '#AAA', marginTop: 2 }}>seguidores</div>
+        <div style={{ fontSize: 11, color: '#AAA', marginTop: 2 }}>{camp.plataforma || 'Ambas'}</div>
       </div>
       <div style={{ gridColumn: '1 / -1' }}>
         <div style={{ height: 6, background: '#E5E5E2', borderRadius: 3, overflow: 'hidden' }}>
-          <div style={{ height: '100%', width: pct + '%', background: barColor, borderRadius: 3, transition: 'width .3s' }} />
+          <div style={{ height: '100%', width: pct + '%', background: barColor, borderRadius: 3 }} />
         </div>
       </div>
     </div>
   )
 }
 
-const EMPTY_CAMP = { nombre: '', cliente: '', budget: '', moneda: 'CLP', brief: '' }
-const EMPTY_CI = { costo: '', piezas: '1', estado: 'Contactado', notas: '' }
+const EMPTY_CAMP = { nombre: '', cliente: '', budget: '', moneda: 'CLP', brief: '', plataforma: 'Ambas' }
+const EMPTY_CI = { costo: '', piezas: '1', estado: 'Contactado', notas: '', video_link: '' }
 
 export default function Campanas() {
   const [camps, setCamps] = useState([])
@@ -153,6 +171,8 @@ export default function Campanas() {
 
   const [modalAddInf, setModalAddInf] = useState(false)
   const [infSearch, setInfSearch] = useState('')
+  const [infFilterTipo, setInfFilterTipo] = useState('')
+  const [infFilterSize, setInfFilterSize] = useState('')
   const [selInf, setSelInf] = useState(null)
   const [ciForm, setCiForm] = useState(EMPTY_CI)
   const [savingCI, setSavingCI] = useState(false)
@@ -173,15 +193,13 @@ export default function Campanas() {
       const data = await sql`
         SELECT
           c.*,
-          ci.id AS ci_id,
-          ci.costo, ci.piezas,
-          ci.estado AS ci_estado,
-          ci.notas AS ci_notas,
-          ci.influencer_id,
+          ci.id AS ci_id, ci.costo, ci.piezas,
+          ci.estado AS ci_estado, ci.notas AS ci_notas,
+          ci.video_link, ci.influencer_id,
           i.nombre AS inf_nombre,
           i.ig_usuario, i.ig_seguidores,
           i.tt_usuario, i.tt_seguidores,
-          i.tipo_contenido, i.avatar_url
+          i.tipos_contenido, i.avatar_url
         FROM campaigns c
         LEFT JOIN campaign_influencers ci ON ci.campaign_id = c.id
         LEFT JOIN influencers i ON i.id = ci.influencer_id
@@ -195,19 +213,20 @@ export default function Campanas() {
             budget: row.budget, moneda: row.moneda, brief: row.brief,
             estado: row.estado, share_token: row.share_token,
             share_active: row.share_active, created_at: row.created_at,
+            plataforma: row.plataforma || 'Ambas',
             influencers: [],
           }
         }
         if (row.ci_id) {
           grouped[row.id].influencers.push({
-            ci_id: row.ci_id,
-            influencer_id: row.influencer_id,
+            ci_id: row.ci_id, influencer_id: row.influencer_id,
             costo: row.costo, piezas: row.piezas,
             ci_estado: row.ci_estado, ci_notas: row.ci_notas,
+            video_link: row.video_link || '',
             nombre: row.inf_nombre,
             ig_usuario: row.ig_usuario, ig_seguidores: row.ig_seguidores,
             tt_usuario: row.tt_usuario, tt_seguidores: row.tt_seguidores,
-            tipo_contenido: row.tipo_contenido,
+            tipos_contenido: row.tipos_contenido || [],
           })
         }
       })
@@ -236,12 +255,12 @@ export default function Campanas() {
     setSavingCamp(true)
     try {
       await sql`
-        INSERT INTO campaigns (nombre, cliente, budget, moneda, brief, share_token)
+        INSERT INTO campaigns (nombre, cliente, budget, moneda, brief, plataforma, share_token)
         VALUES (
           ${campForm.nombre}, ${campForm.cliente},
           ${parseInt(campForm.budget) || 0},
           ${campForm.moneda}, ${campForm.brief},
-          ${crypto.randomUUID()}
+          ${campForm.plataforma}, ${crypto.randomUUID()}
         )
       `
       setModalNewCamp(false)
@@ -268,24 +287,17 @@ export default function Campanas() {
     } catch (e) { console.error(e) }
   }
 
-  function openAddInf() {
-    setSelInf(null)
-    setCiForm(EMPTY_CI)
-    setInfSearch('')
-    setModalAddInf(true)
-  }
-
   async function addInfluencer() {
     if (!selInf) return
     setSavingCI(true)
     try {
       await sql`
-        INSERT INTO campaign_influencers (campaign_id, influencer_id, costo, piezas, estado, notas)
+        INSERT INTO campaign_influencers (campaign_id, influencer_id, costo, piezas, estado, notas, video_link)
         VALUES (
           ${currentCamp.id}, ${selInf.id},
           ${parseInt(ciForm.costo) || 0},
           ${parseInt(ciForm.piezas) || 1},
-          ${ciForm.estado}, ${ciForm.notas}
+          ${ciForm.estado}, ${ciForm.notas}, ${ciForm.video_link}
         )
       `
       setModalAddInf(false)
@@ -307,6 +319,7 @@ export default function Campanas() {
     setEditCIForm({
       costo: inf.costo, piezas: inf.piezas,
       estado: inf.ci_estado, notas: inf.ci_notas || '',
+      video_link: inf.video_link || '',
     })
     setEditCIModal(true)
   }
@@ -318,7 +331,8 @@ export default function Campanas() {
           costo = ${parseInt(editCIForm.costo) || 0},
           piezas = ${parseInt(editCIForm.piezas) || 1},
           estado = ${editCIForm.estado},
-          notas = ${editCIForm.notas}
+          notas = ${editCIForm.notas},
+          video_link = ${editCIForm.video_link}
         WHERE id = ${editCI.ci_id}
       `
       setEditCIModal(false)
@@ -326,24 +340,30 @@ export default function Campanas() {
     } catch (e) { console.error(e) }
   }
 
-  const availableInfs = roster.filter(inf =>
-    !currentCamp?.influencers.find(i => i.influencer_id === inf.id) &&
-    (infSearch === '' ||
-      inf.nombre.toLowerCase().includes(infSearch.toLowerCase()) ||
-      inf.ig_usuario.toLowerCase().includes(infSearch.toLowerCase()) ||
-      inf.tt_usuario.toLowerCase().includes(infSearch.toLowerCase()))
-  )
-
   const filteredCamps = camps.filter(c => {
     if (tab === 'Todas') return true
-    if (tab === 'Activas') return c.estado === 'Activa'
-    if (tab === 'Pausadas') return c.estado === 'Pausada'
-    if (tab === 'Cerradas') return c.estado === 'Cerrada'
-    if (tab === 'Canceladas') return c.estado === 'Cancelada'
-    return true
+    return c.estado === tab.slice(0, -1)
+  })
+
+  const availableInfs = roster.filter(inf => {
+    if (currentCamp?.influencers.find(i => i.influencer_id === inf.id)) return false
+    const q = infSearch.toLowerCase()
+    const matchSearch = !q || inf.nombre.toLowerCase().includes(q) ||
+      (inf.ig_usuario || '').toLowerCase().includes(q) ||
+      (inf.tt_usuario || '').toLowerCase().includes(q)
+    const tipos = inf.tipos_contenido || []
+    const matchTipo = !infFilterTipo || tipos.includes(infFilterTipo)
+    const matchSize = !infFilterSize || (
+      getSize(inf.ig_seguidores).label === infFilterSize ||
+      getSize(inf.tt_seguidores).label === infFilterSize
+    )
+    return matchSearch && matchTipo && matchSize
   })
 
   const isReadOnly = currentCamp && (currentCamp.estado === 'Cerrada' || currentCamp.estado === 'Cancelada')
+  const plat = currentCamp?.plataforma || 'Ambas'
+  const showIG = plat === 'Ambas' || plat === 'Instagram'
+  const showTT = plat === 'Ambas' || plat === 'TikTok'
 
   if (loading) return <div style={{ padding: 40, color: '#AAA', fontSize: 13 }}>Cargando...</div>
 
@@ -353,27 +373,19 @@ export default function Campanas() {
       <div style={{ padding: '20px 24px' }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20 }}>
           <div>
-            <div
-              style={{ fontSize: 12, color: '#AAA', cursor: 'pointer', marginBottom: 4, display: 'inline-flex', alignItems: 'center', gap: 4 }}
-              onClick={() => setCurrentCamp(null)}
-            >
+            <div style={{ fontSize: 12, color: '#AAA', cursor: 'pointer', marginBottom: 4 }} onClick={() => setCurrentCamp(null)}>
               ← Volver a campañas
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
               <h1 style={{ fontSize: 20, fontWeight: 500 }}>{currentCamp.nombre}</h1>
-              <span style={{ fontSize: 11, padding: '2px 9px', borderRadius: 20, background: ec.bg, color: ec.color }}>
-                {currentCamp.estado}
-              </span>
+              <span style={{ fontSize: 11, padding: '2px 9px', borderRadius: 20, background: ec.bg, color: ec.color }}>{currentCamp.estado}</span>
+              <span style={{ fontSize: 11, padding: '2px 9px', borderRadius: 20, background: '#F0F0EE', color: '#666' }}>{plat}</span>
             </div>
             <p style={{ fontSize: 12, color: '#888', marginTop: 2 }}>{currentCamp.cliente} · {currentCamp.moneda}</p>
           </div>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <button className="btn-ghost" onClick={() => setChangeEstadoModal(true)}>
-              Cambiar estado
-            </button>
-            {!isReadOnly && (
-              <button className="btn-red" onClick={openAddInf}>+ Agregar influencer</button>
-            )}
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn-ghost" onClick={() => setChangeEstadoModal(true)}>Cambiar estado</button>
+            {!isReadOnly && <button className="btn-red" onClick={() => { setSelInf(null); setCiForm(EMPTY_CI); setInfSearch(''); setInfFilterTipo(''); setInfFilterSize(''); setModalAddInf(true) }}>+ Agregar influencer</button>}
           </div>
         </div>
 
@@ -381,11 +393,10 @@ export default function Campanas() {
           <div style={{
             background: currentCamp.estado === 'Cancelada' ? '#FCEBEB' : '#E6F1FB',
             border: `0.5px solid ${currentCamp.estado === 'Cancelada' ? '#F7C1C1' : '#B5D4F4'}`,
-            borderRadius: 10, padding: '10px 14px', marginBottom: 20,
-            fontSize: 13,
+            borderRadius: 10, padding: '10px 14px', marginBottom: 20, fontSize: 13,
             color: currentCamp.estado === 'Cancelada' ? '#791F1F' : '#0C447C',
           }}>
-            Campaña {currentCamp.estado.toLowerCase()} — modo lectura. No se pueden agregar ni editar influencers.
+            Campaña {currentCamp.estado.toLowerCase()} — modo lectura.
           </div>
         )}
 
@@ -400,56 +411,82 @@ export default function Campanas() {
         <div className="card" style={{ overflow: 'hidden' }}>
           {currentCamp.influencers.length === 0 ? (
             <div style={{ padding: 40, textAlign: 'center', color: '#AAA', fontSize: 13 }}>
-              No hay influencers en esta campaña.
+              Agrega influencers desde el roster.
             </div>
           ) : (
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
                 <thead>
                   <tr style={{ background: '#F7F7F5', borderBottom: '0.5px solid #E5E5E2' }}>
-                    <th className="th" style={{ width: 200 }}>Influencer</th>
-                    <th className="th" style={{ width: 90 }}>Total seg.</th>
-                    <th className="th" style={{ width: 90 }}>Tipo</th>
-                    <th className="th" style={{ width: 100 }}>Costo</th>
-                    <th className="th" style={{ width: 60 }}>Piezas</th>
-                    <th className="th" style={{ width: 130 }}>Estado</th>
-                    {!isReadOnly && <th className="th" style={{ width: 70 }}>Acciones</th>}
+                    <th className="th" style={{ width: 180 }}>Influencer</th>
+                    {showIG && <th className="th" style={{ width: 100 }}>Instagram</th>}
+                    {showTT && <th className="th" style={{ width: 100 }}>TikTok</th>}
+                    <th className="th" style={{ width: 90 }}>Categorías</th>
+                    <th className="th" style={{ width: 90 }}>Costo</th>
+                    <th className="th" style={{ width: 50 }}>Piezas</th>
+                    <th className="th" style={{ width: 120 }}>Estado</th>
+                    <th className="th" style={{ width: 80 }}>Video</th>
+                    {!isReadOnly && <th className="th" style={{ width: 70 }}></th>}
                   </tr>
                 </thead>
                 <tbody>
                   {currentCamp.influencers.map((inf, i) => {
-                    const total = Number(inf.ig_seguidores) + Number(inf.tt_seguidores)
-                    const tc = TIPO_COLORS[inf.tipo_contenido] || TIPO_COLORS['Otros']
                     const ec = ESTADO_INF_COLORS[inf.ci_estado] || ESTADO_INF_COLORS['Contactado']
+                    const igSize = getSize(inf.ig_seguidores)
+                    const ttSize = getSize(inf.tt_seguidores)
+                    const tipos = inf.tipos_contenido || []
                     return (
                       <tr key={inf.ci_id} style={{ borderBottom: '0.5px solid #F0F0EE' }}>
                         <td className="td">
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                             <Avatar nombre={inf.nombre} index={i} />
                             <div>
                               <div style={{ fontWeight: 500, fontSize: 13 }}>{inf.nombre}</div>
-                              <div style={{ fontSize: 11, color: '#AAA' }}>{inf.tt_usuario || inf.ig_usuario}</div>
                             </div>
                           </div>
                         </td>
-                        <td className="td" style={{ fontWeight: 500, fontSize: 13 }}>{fmtSeg(total)}</td>
+                        {showIG && (
+                          <td className="td">
+                            <div style={{ fontSize: 12.5, color: '#555' }}>{fmtSeg(inf.ig_seguidores)}</div>
+                            <span style={{ background: igSize.bg, color: igSize.color, padding: '0px 6px', borderRadius: 20, fontSize: 10 }}>{igSize.label}</span>
+                          </td>
+                        )}
+                        {showTT && (
+                          <td className="td">
+                            <div style={{ fontSize: 12.5, color: '#555' }}>{fmtSeg(inf.tt_seguidores)}</div>
+                            <span style={{ background: ttSize.bg, color: ttSize.color, padding: '0px 6px', borderRadius: 20, fontSize: 10 }}>{ttSize.label}</span>
+                          </td>
+                        )}
                         <td className="td">
-                          <span style={{ background: tc.bg, color: tc.color, padding: '2px 8px', borderRadius: 20, fontSize: 11 }}>
-                            {inf.tipo_contenido}
-                          </span>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+                            {tipos.slice(0, 2).map(t => {
+                              const c = TIPO_COLORS[t] || TIPO_COLORS['Otros']
+                              return <span key={t} style={{ background: c.bg, color: c.color, padding: '1px 6px', borderRadius: 20, fontSize: 10 }}>{t}</span>
+                            })}
+                            {tipos.length > 2 && <span style={{ fontSize: 10, color: '#AAA' }}>+{tipos.length - 2}</span>}
+                          </div>
                         </td>
                         <td className="td" style={{ fontWeight: 500 }}>{fmtMoney(inf.costo, currentCamp.moneda)}</td>
                         <td className="td" style={{ color: '#555' }}>{inf.piezas}</td>
                         <td className="td">
-                          <span style={{ background: ec.bg, color: ec.color, padding: '2px 8px', borderRadius: 20, fontSize: 11 }}>
-                            {inf.ci_estado}
-                          </span>
+                          <span style={{ background: ec.bg, color: ec.color, padding: '2px 8px', borderRadius: 20, fontSize: 11 }}>{inf.ci_estado}</span>
+                        </td>
+                        <td className="td">
+                          {inf.video_link ? (
+                            <a href={inf.video_link} target="_blank" rel="noopener noreferrer"
+                              style={{ color: '#E8313A', fontSize: 12, textDecoration: 'none' }}
+                              onMouseEnter={e => e.target.style.textDecoration = 'underline'}
+                              onMouseLeave={e => e.target.style.textDecoration = 'none'}
+                            >Ver ↗</a>
+                          ) : (
+                            <span style={{ color: '#CCC', fontSize: 12 }}>—</span>
+                          )}
                         </td>
                         {!isReadOnly && (
                           <td className="td">
                             <div style={{ display: 'flex', gap: 4 }}>
-                              <button className="btn-icon" onClick={() => openEditCI(inf)} title="Editar">✎</button>
-                              <button className="btn-icon btn-icon-danger" onClick={() => setDeleteCI(inf.ci_id)} title="Quitar">✕</button>
+                              <button className="btn-icon" onClick={() => openEditCI(inf)}>✎</button>
+                              <button className="btn-icon btn-icon-danger" onClick={() => setDeleteCI(inf.ci_id)}>✕</button>
                             </div>
                           </td>
                         )}
@@ -462,16 +499,14 @@ export default function Campanas() {
           )}
         </div>
 
-        {/* Modal cambiar estado campaña */}
-        <Modal open={changeEstadoModal} onClose={() => setChangeEstadoModal(false)} title="Cambiar estado de campaña">
+        {/* Modal cambiar estado */}
+        <Modal open={changeEstadoModal} onClose={() => setChangeEstadoModal(false)} title="Cambiar estado">
           <p style={{ fontSize: 13, color: '#888', marginBottom: 16 }}>Estado actual: <strong>{currentCamp.estado}</strong></p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
             {['Activa', 'Pausada', 'Cerrada', 'Cancelada'].filter(e => e !== currentCamp.estado).map(estado => {
               const ec = ESTADO_CAMP_COLORS[estado]
               return (
-                <button
-                  key={estado}
-                  onClick={() => updateEstado(currentCamp.id, estado)}
+                <button key={estado} onClick={() => updateEstado(currentCamp.id, estado)}
                   style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                     padding: '10px 14px', borderRadius: 8, cursor: 'pointer',
@@ -496,57 +531,68 @@ export default function Campanas() {
 
         {/* Modal agregar influencer */}
         <Modal open={modalAddInf} onClose={() => setModalAddInf(false)} title="Agregar influencer">
-          <div className="fg">
-            <label className="label">Buscar en roster</label>
-            <input className="input" placeholder="Nombre o usuario..." value={infSearch} onChange={e => { setInfSearch(e.target.value); setSelInf(null) }} />
+          <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+            <input className="input" placeholder="Buscar..." value={infSearch}
+              onChange={e => { setInfSearch(e.target.value); setSelInf(null) }}
+              style={{ flex: 1 }} />
+            <select className="input" style={{ width: 120 }} value={infFilterTipo} onChange={e => { setInfFilterTipo(e.target.value); setSelInf(null) }}>
+              <option value="">Categoría</option>
+              {TIPOS.map(t => <option key={t}>{t}</option>)}
+            </select>
+            <select className="input" style={{ width: 100 }} value={infFilterSize} onChange={e => { setInfFilterSize(e.target.value); setSelInf(null) }}>
+              <option value="">Tamaño</option>
+              {SIZE_RANGES.map(s => <option key={s.label}>{s.label}</option>)}
+            </select>
           </div>
-          <div style={{ border: '0.5px solid #E5E5E2', borderRadius: 8, maxHeight: 220, overflowY: 'auto', marginBottom: 14 }}>
+          <div style={{ border: '0.5px solid #E5E5E2', borderRadius: 8, maxHeight: 240, overflowY: 'auto', marginBottom: 14 }}>
             {availableInfs.length === 0 ? (
-              <div style={{ padding: 16, textAlign: 'center', color: '#AAA', fontSize: 12 }}>
-                {infSearch ? 'Sin resultados' : 'Todos los influencers activos ya están en la campaña'}
-              </div>
-            ) : availableInfs.map((inf, i) => (
-              <div
-                key={inf.id}
-                onClick={() => setSelInf(inf)}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 10,
-                  padding: '9px 12px', cursor: 'pointer',
-                  borderBottom: '0.5px solid #F0F0EE',
-                  background: selInf?.id === inf.id ? '#FCEBEB' : 'transparent',
-                }}
-              >
-                <div style={{
-                  width: 16, height: 16, borderRadius: 4,
-                  border: '0.5px solid ' + (selInf?.id === inf.id ? '#E8313A' : '#D0D0CC'),
-                  background: selInf?.id === inf.id ? '#E8313A' : 'transparent',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  flexShrink: 0, fontSize: 10, color: '#fff',
-                }}>
-                  {selInf?.id === inf.id ? '✓' : ''}
-                </div>
-                <Avatar nombre={inf.nombre} index={i} size={26} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 500 }}>{inf.nombre}</div>
-                  <div style={{ fontSize: 11, color: '#AAA' }}>
-                    {inf.tt_usuario} · {fmtSeg(Number(inf.ig_seguidores) + Number(inf.tt_seguidores))} seg. · {inf.tipo_contenido}
+              <div style={{ padding: 16, textAlign: 'center', color: '#AAA', fontSize: 12 }}>Sin resultados</div>
+            ) : availableInfs.map((inf, i) => {
+              const igS = getSize(inf.ig_seguidores)
+              const ttS = getSize(inf.tt_seguidores)
+              const tipos = inf.tipos_contenido || []
+              return (
+                <div key={inf.id} onClick={() => setSelInf(inf)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 10,
+                    padding: '9px 12px', cursor: 'pointer',
+                    borderBottom: '0.5px solid #F0F0EE',
+                    background: selInf?.id === inf.id ? '#FCEBEB' : 'transparent',
+                  }}
+                >
+                  <div style={{
+                    width: 16, height: 16, borderRadius: 4, flexShrink: 0,
+                    border: '0.5px solid ' + (selInf?.id === inf.id ? '#E8313A' : '#D0D0CC'),
+                    background: selInf?.id === inf.id ? '#E8313A' : 'transparent',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 10, color: '#fff',
+                  }}>{selInf?.id === inf.id ? '✓' : ''}</div>
+                  <Avatar nombre={inf.nombre} index={i} size={26} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 500 }}>{inf.nombre}</div>
+                    <div style={{ fontSize: 11, color: '#AAA', display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 2 }}>
+                      {showIG && <span>IG {fmtSeg(inf.ig_seguidores)} <span style={{ background: igS.bg, color: igS.color, padding: '0 5px', borderRadius: 10 }}>{igS.label}</span></span>}
+                      {showTT && <span>TT {fmtSeg(inf.tt_seguidores)} <span style={{ background: ttS.bg, color: ttS.color, padding: '0 5px', borderRadius: 10 }}>{ttS.label}</span></span>}
+                      {tipos.slice(0, 2).map(t => {
+                        const c = TIPO_COLORS[t] || TIPO_COLORS['Otros']
+                        return <span key={t} style={{ background: c.bg, color: c.color, padding: '0 5px', borderRadius: 10 }}>{t}</span>
+                      })}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
           {selInf && (
             <div style={{ borderTop: '0.5px solid #F0F0EE', paddingTop: 14 }}>
-              <div style={{ fontSize: 12, color: '#888', marginBottom: 10 }}>
-                Configurando: <strong>{selInf.nombre}</strong>
-              </div>
+              <div style={{ fontSize: 12, color: '#888', marginBottom: 10 }}>Configurando: <strong>{selInf.nombre}</strong></div>
               <div className="form-row-2">
                 <div className="fg">
                   <label className="label">Costo ({currentCamp.moneda})</label>
                   <input className="input" type="number" value={ciForm.costo} onChange={e => setCiForm(f => ({ ...f, costo: e.target.value }))} placeholder="0" />
                 </div>
                 <div className="fg">
-                  <label className="label">Piezas / posts</label>
+                  <label className="label">Piezas</label>
                   <input className="input" type="number" value={ciForm.piezas} onChange={e => setCiForm(f => ({ ...f, piezas: e.target.value }))} />
                 </div>
               </div>
@@ -570,6 +616,7 @@ export default function Campanas() {
           </div>
         </Modal>
 
+        {/* Modal editar influencer en campaña */}
         <Modal open={editCIModal} onClose={() => setEditCIModal(false)} title={`Editar — ${editCI?.nombre}`}>
           <div className="form-row-2">
             <div className="fg">
@@ -577,7 +624,7 @@ export default function Campanas() {
               <input className="input" type="number" value={editCIForm.costo} onChange={e => setEditCIForm(f => ({ ...f, costo: e.target.value }))} />
             </div>
             <div className="fg">
-              <label className="label">Piezas / posts</label>
+              <label className="label">Piezas</label>
               <input className="input" type="number" value={editCIForm.piezas} onChange={e => setEditCIForm(f => ({ ...f, piezas: e.target.value }))} />
             </div>
           </div>
@@ -586,6 +633,10 @@ export default function Campanas() {
             <select className="input" value={editCIForm.estado} onChange={e => setEditCIForm(f => ({ ...f, estado: e.target.value }))}>
               {ESTADOS_INF.map(e => <option key={e}>{e}</option>)}
             </select>
+          </div>
+          <div className="fg">
+            <label className="label">Link del video / post</label>
+            <input className="input" value={editCIForm.video_link} onChange={e => setEditCIForm(f => ({ ...f, video_link: e.target.value }))} placeholder="https://tiktok.com/..." />
           </div>
           <div className="fg">
             <label className="label">Notas internas</label>
@@ -598,9 +649,7 @@ export default function Campanas() {
         </Modal>
 
         <Modal open={!!deleteCI} onClose={() => setDeleteCI(null)} title="Quitar influencer">
-          <p style={{ fontSize: 13, color: '#555', marginBottom: 20 }}>
-            ¿Quitar este influencer de la campaña? Los datos de costo y estado se perderán.
-          </p>
+          <p style={{ fontSize: 13, color: '#555', marginBottom: 20 }}>¿Quitar este influencer? Los datos se perderán.</p>
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
             <button className="btn-ghost" onClick={() => setDeleteCI(null)}>Cancelar</button>
             <button className="btn-danger" onClick={() => removeInfluencer(deleteCI)}>Quitar</button>
@@ -620,33 +669,20 @@ export default function Campanas() {
         <button className="btn-red" onClick={() => { setCampForm(EMPTY_CAMP); setModalNewCamp(true) }}>+ Nueva campaña</button>
       </div>
 
-      {/* Tabs */}
       <div style={{ display: 'flex', gap: 2, background: '#F0F0EE', borderRadius: 10, padding: 3, marginBottom: 20, width: 'fit-content', border: '0.5px solid #E5E5E2' }}>
         {TABS.map(t => {
           const count = t === 'Todas' ? camps.length : camps.filter(c => c.estado === t.slice(0, -1)).length
           return (
-            <div
-              key={t}
-              onClick={() => setTab(t)}
-              style={{
-                padding: '6px 14px', borderRadius: 8, cursor: 'pointer',
-                fontSize: 12.5, transition: 'all .12s', display: 'flex', alignItems: 'center', gap: 5,
-                background: tab === t ? '#fff' : 'transparent',
-                color: tab === t ? '#1A1A1A' : '#888',
-                boxShadow: tab === t ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
-                border: tab === t ? '0.5px solid #E5E5E2' : '0.5px solid transparent',
-              }}
-            >
+            <div key={t} onClick={() => setTab(t)} style={{
+              padding: '6px 14px', borderRadius: 8, cursor: 'pointer',
+              fontSize: 12.5, transition: 'all .12s', display: 'flex', alignItems: 'center', gap: 5,
+              background: tab === t ? '#fff' : 'transparent',
+              color: tab === t ? '#1A1A1A' : '#888',
+              boxShadow: tab === t ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+              border: tab === t ? '0.5px solid #E5E5E2' : '0.5px solid transparent',
+            }}>
               {t}
-              {count > 0 && (
-                <span style={{
-                  fontSize: 10, padding: '0px 5px', borderRadius: 20,
-                  background: tab === t ? '#F0F0EE' : 'transparent',
-                  color: '#AAA',
-                }}>
-                  {count}
-                </span>
-              )}
+              {count > 0 && <span style={{ fontSize: 10, color: '#AAA' }}>{count}</span>}
             </div>
           )
         })}
@@ -663,46 +699,25 @@ export default function Campanas() {
             const ec = ESTADO_CAMP_COLORS[camp.estado] || ESTADO_CAMP_COLORS['Activa']
             const isInactive = camp.estado === 'Cerrada' || camp.estado === 'Cancelada'
             return (
-              <div
-                key={camp.id}
-                className="card"
-                style={{
-                  padding: 18, cursor: 'pointer', transition: 'border-color .15s',
-                  position: 'relative', opacity: isInactive ? 0.75 : 1,
-                }}
+              <div key={camp.id} className="card"
+                style={{ padding: 18, cursor: 'pointer', transition: 'border-color .15s', opacity: isInactive ? 0.75 : 1 }}
                 onClick={() => setCurrentCamp(camp)}
                 onMouseEnter={e => e.currentTarget.style.borderColor = '#E8313A'}
                 onMouseLeave={e => e.currentTarget.style.borderColor = '#E5E5E2'}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 2 }}>
                   <div style={{ fontSize: 14, fontWeight: 500, flex: 1, paddingRight: 8 }}>{camp.nombre}</div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-                    <span style={{ fontSize: 10.5, padding: '1px 7px', borderRadius: 20, background: ec.bg, color: ec.color }}>
-                      {camp.estado}
-                    </span>
-                    <button
-                      className="btn-icon btn-icon-danger"
-                      onClick={e => { e.stopPropagation(); setDeleteCampId(camp.id) }}
-                      title="Eliminar campaña"
-                    >✕</button>
+                  <div style={{ display: 'flex', gap: 5, flexShrink: 0 }}>
+                    <span style={{ fontSize: 10.5, padding: '1px 7px', borderRadius: 20, background: ec.bg, color: ec.color }}>{camp.estado}</span>
+                    <button className="btn-icon btn-icon-danger" onClick={e => { e.stopPropagation(); setDeleteCampId(camp.id) }}>✕</button>
                   </div>
                 </div>
-                <div style={{ fontSize: 12, color: '#888', marginBottom: 12 }}>{camp.cliente}</div>
+                <div style={{ fontSize: 12, color: '#888', marginBottom: 4 }}>{camp.cliente}</div>
+                <div style={{ fontSize: 11, color: '#AAA', marginBottom: 10 }}>{camp.plataforma || 'Ambas'}</div>
                 <div style={{ display: 'flex', gap: 14, marginBottom: 4 }}>
-                  <div>
-                    <div style={{ fontSize: 10.5, color: '#AAA' }}>Influencers</div>
-                    <div style={{ fontSize: 15, fontWeight: 500 }}>{camp.influencers.length}</div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 10.5, color: '#AAA' }}>Alcance</div>
-                    <div style={{ fontSize: 15, fontWeight: 500 }}>
-                      {fmtSeg(camp.influencers.reduce((s, i) => s + Number(i.ig_seguidores || 0) + Number(i.tt_seguidores || 0), 0))}
-                    </div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 10.5, color: '#AAA' }}>Moneda</div>
-                    <div style={{ fontSize: 15, fontWeight: 500 }}>{camp.moneda}</div>
-                  </div>
+                  <div><div style={{ fontSize: 10.5, color: '#AAA' }}>Influencers</div><div style={{ fontSize: 15, fontWeight: 500 }}>{camp.influencers.length}</div></div>
+                  <div><div style={{ fontSize: 10.5, color: '#AAA' }}>Alcance</div><div style={{ fontSize: 15, fontWeight: 500 }}>{fmtSeg(camp.influencers.reduce((s, i) => s + Number(i.ig_seguidores || 0) + Number(i.tt_seguidores || 0), 0))}</div></div>
+                  <div><div style={{ fontSize: 10.5, color: '#AAA' }}>Moneda</div><div style={{ fontSize: 15, fontWeight: 500 }}>{camp.moneda}</div></div>
                 </div>
                 <BudgetBar usado={usado} total={Number(camp.budget)} />
               </div>
@@ -728,10 +743,15 @@ export default function Campanas() {
           <div className="fg">
             <label className="label">Moneda</label>
             <select className="input" value={campForm.moneda} onChange={e => setCampForm(f => ({ ...f, moneda: e.target.value }))}>
-              <option>CLP</option>
-              <option>USD</option>
+              <option>CLP</option><option>USD</option>
             </select>
           </div>
+        </div>
+        <div className="fg">
+          <label className="label">Plataforma</label>
+          <select className="input" value={campForm.plataforma} onChange={e => setCampForm(f => ({ ...f, plataforma: e.target.value }))}>
+            {PLATAFORMAS.map(p => <option key={p}>{p}</option>)}
+          </select>
         </div>
         <div className="fg">
           <label className="label">Brief / descripción (opcional)</label>
@@ -739,16 +759,12 @@ export default function Campanas() {
         </div>
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
           <button className="btn-ghost" onClick={() => setModalNewCamp(false)}>Cancelar</button>
-          <button className="btn-red" onClick={saveCamp} disabled={savingCamp}>
-            {savingCamp ? 'Creando...' : 'Crear campaña'}
-          </button>
+          <button className="btn-red" onClick={saveCamp} disabled={savingCamp}>{savingCamp ? 'Creando...' : 'Crear campaña'}</button>
         </div>
       </Modal>
 
       <Modal open={!!deleteCampId} onClose={() => setDeleteCampId(null)} title="Eliminar campaña">
-        <p style={{ fontSize: 13, color: '#555', marginBottom: 20 }}>
-          ¿Eliminar esta campaña? Se borrarán todos los influencers asociados. Esta acción no se puede deshacer.
-        </p>
+        <p style={{ fontSize: 13, color: '#555', marginBottom: 20 }}>¿Eliminar esta campaña? Se borrarán todos los datos asociados.</p>
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
           <button className="btn-ghost" onClick={() => setDeleteCampId(null)}>Cancelar</button>
           <button className="btn-danger" onClick={() => deleteCamp(deleteCampId)}>Eliminar</button>
