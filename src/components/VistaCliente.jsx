@@ -44,6 +44,28 @@ function Avatar({ nombre, index, size = 36 }) {
   )
 }
 
+function ProfileLink({ username, link, platform }) {
+  if (!username) return <span style={{ color: '#CCC', fontSize: 13 }}>—</span>
+  const color = platform === 'ig' ? '#C2185B' : '#1A1A1A'
+  if (link) return (
+    <a
+      href={link}
+      target="_blank"
+      rel="noopener noreferrer"
+      style={{
+        color, fontWeight: 500, textDecoration: 'none', fontSize: 13,
+        display: 'inline-flex', alignItems: 'center', gap: 3,
+      }}
+      onMouseEnter={e => e.currentTarget.style.textDecoration = 'underline'}
+      onMouseLeave={e => e.currentTarget.style.textDecoration = 'none'}
+    >
+      {username}
+      <span style={{ fontSize: 10, opacity: 0.6 }}>↗</span>
+    </a>
+  )
+  return <span style={{ fontSize: 13, color: '#555', fontWeight: 500 }}>{username}</span>
+}
+
 export default function VistaCliente({ token }) {
   const [camp, setCamp] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -61,8 +83,8 @@ export default function VistaCliente({ token }) {
           c.nombre AS camp_nombre,
           c.cliente,
           i.nombre,
-          i.ig_usuario, i.ig_seguidores,
-          i.tt_usuario, i.tt_seguidores,
+          i.ig_usuario, i.ig_seguidores, i.ig_link,
+          i.tt_usuario, i.tt_seguidores, i.tt_link,
           i.tipo_contenido, i.avatar_url
         FROM campaigns c
         JOIN campaign_influencers ci ON ci.campaign_id = c.id
@@ -71,11 +93,8 @@ export default function VistaCliente({ token }) {
           AND c.share_active = true
       `
       if (rows.length === 0) {
-        const check = await sql`
-          SELECT id FROM campaigns WHERE share_token = ${t}
-        `
-        if (check.length === 0) setError('not_found')
-        else setError('inactive')
+        const check = await sql`SELECT id FROM campaigns WHERE share_token = ${t}`
+        setError(check.length === 0 ? 'not_found' : 'inactive')
       } else {
         setCamp({
           nombre: rows[0].camp_nombre,
@@ -90,29 +109,25 @@ export default function VistaCliente({ token }) {
     setLoading(false)
   }
 
-  if (loading) {
-    return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#F7F7F5' }}>
-        <div style={{ fontSize: 13, color: '#AAA' }}>Cargando propuesta...</div>
-      </div>
-    )
-  }
+  if (loading) return (
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#F7F7F5' }}>
+      <div style={{ fontSize: 13, color: '#AAA' }}>Cargando propuesta...</div>
+    </div>
+  )
 
-  if (error) {
-    return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#F7F7F5' }}>
-        <div style={{ textAlign: 'center', color: '#AAA' }}>
-          <div style={{ fontSize: 32, marginBottom: 12 }}>◈</div>
-          <div style={{ fontSize: 15, fontWeight: 500, color: '#555', marginBottom: 6 }}>
-            {error === 'not_found' ? 'Propuesta no encontrada' : error === 'inactive' ? 'Este link ha sido desactivado' : 'Error al cargar la propuesta'}
-          </div>
-          <div style={{ fontSize: 13 }}>
-            {error === 'not_found' ? 'Verifica el link con tu agencia.' : error === 'inactive' ? 'Contacta a tu agencia para obtener un link actualizado.' : 'Intenta recargar la página.'}
-          </div>
+  if (error) return (
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#F7F7F5' }}>
+      <div style={{ textAlign: 'center', color: '#AAA' }}>
+        <div style={{ fontSize: 32, marginBottom: 12 }}>◈</div>
+        <div style={{ fontSize: 15, fontWeight: 500, color: '#555', marginBottom: 6 }}>
+          {error === 'not_found' ? 'Propuesta no encontrada' : error === 'inactive' ? 'Este link ha sido desactivado' : 'Error al cargar la propuesta'}
+        </div>
+        <div style={{ fontSize: 13 }}>
+          {error === 'not_found' ? 'Verifica el link con tu agencia.' : error === 'inactive' ? 'Contacta a tu agencia para obtener un link actualizado.' : 'Intenta recargar la página.'}
         </div>
       </div>
-    )
-  }
+    </div>
+  )
 
   const totalSeg = camp.influencers.reduce((s, i) => s + Number(i.ig_seguidores) + Number(i.tt_seguidores), 0)
   const totalIG = camp.influencers.reduce((s, i) => s + Number(i.ig_seguidores), 0)
@@ -122,7 +137,7 @@ export default function VistaCliente({ token }) {
     <div style={{ minHeight: '100vh', background: '#F7F7F5', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
 
       {/* Header */}
-      <div style={{ background: '#111', padding: '28px 40px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+      <div style={{ background: '#111', padding: '28px 40px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
             <div style={{ width: 28, height: 28, background: '#E8313A', borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#fff' }}>R</div>
@@ -131,23 +146,18 @@ export default function VistaCliente({ token }) {
           <h1 style={{ fontSize: 22, fontWeight: 500, color: '#fff', marginBottom: 4 }}>{camp.nombre}</h1>
           <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)' }}>Propuesta para {camp.cliente}</p>
         </div>
-        <div style={{ display: 'flex', gap: 20, textAlign: 'right' }}>
-          <div>
-            <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 4 }}>Influencers</div>
-            <div style={{ fontSize: 20, fontWeight: 500, color: '#fff' }}>{camp.influencers.length}</div>
-          </div>
-          <div>
-            <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 4 }}>Alcance total</div>
-            <div style={{ fontSize: 20, fontWeight: 500, color: '#fff' }}>{fmtSeg(totalSeg)}</div>
-          </div>
-          <div>
-            <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 4 }}>Instagram</div>
-            <div style={{ fontSize: 20, fontWeight: 500, color: '#fff' }}>{fmtSeg(totalIG)}</div>
-          </div>
-          <div>
-            <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 4 }}>TikTok</div>
-            <div style={{ fontSize: 20, fontWeight: 500, color: '#fff' }}>{fmtSeg(totalTT)}</div>
-          </div>
+        <div style={{ display: 'flex', gap: 20, textAlign: 'right', flexWrap: 'wrap' }}>
+          {[
+            { label: 'Influencers', value: camp.influencers.length },
+            { label: 'Alcance total', value: fmtSeg(totalSeg) },
+            { label: 'Instagram', value: fmtSeg(totalIG) },
+            { label: 'TikTok', value: fmtSeg(totalTT) },
+          ].map(({ label, value }) => (
+            <div key={label}>
+              <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 4 }}>{label}</div>
+              <div style={{ fontSize: 20, fontWeight: 500, color: '#fff' }}>{value}</div>
+            </div>
+          ))}
         </div>
       </div>
 
@@ -158,11 +168,14 @@ export default function VistaCliente({ token }) {
             <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
               <thead>
                 <tr style={{ background: '#F7F7F5', borderBottom: '0.5px solid #E5E5E2' }}>
-                  <th style={{ padding: '11px 16px', textAlign: 'left', fontSize: 10.5, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '.08em', color: '#AAA', width: 220 }}>Influencer</th>
-                  <th style={{ padding: '11px 16px', textAlign: 'left', fontSize: 10.5, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '.08em', color: '#AAA', width: 150 }}>Instagram</th>
-                  <th style={{ padding: '11px 16px', textAlign: 'left', fontSize: 10.5, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '.08em', color: '#AAA', width: 150 }}>TikTok</th>
-                  <th style={{ padding: '11px 16px', textAlign: 'left', fontSize: 10.5, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '.08em', color: '#AAA', width: 110 }}>Total seg.</th>
-                  <th style={{ padding: '11px 16px', textAlign: 'left', fontSize: 10.5, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '.08em', color: '#AAA', width: 100 }}>Tipo</th>
+                  {['Influencer', 'Instagram', 'TikTok', 'Total seg.', 'Tipo'].map((h, i) => (
+                    <th key={h} style={{
+                      padding: '11px 16px', textAlign: 'left',
+                      fontSize: 10.5, fontWeight: 500,
+                      textTransform: 'uppercase', letterSpacing: '.08em', color: '#AAA',
+                      width: [220, 160, 160, 110, 110][i],
+                    }}>{h}</th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
@@ -178,14 +191,20 @@ export default function VistaCliente({ token }) {
                         </div>
                       </td>
                       <td style={{ padding: '13px 16px', verticalAlign: 'middle' }}>
-                        <div style={{ fontSize: 13, color: '#555' }}>{inf.ig_usuario || '—'}</div>
-                        <div style={{ fontSize: 11, color: '#AAA' }}>{inf.ig_seguidores ? fmtSeg(inf.ig_seguidores) + ' seg.' : ''}</div>
+                        <ProfileLink username={inf.ig_usuario} link={inf.ig_link} platform="ig" />
+                        <div style={{ fontSize: 11, color: '#AAA', marginTop: 1 }}>
+                          {inf.ig_seguidores ? fmtSeg(inf.ig_seguidores) + ' seg.' : ''}
+                        </div>
                       </td>
                       <td style={{ padding: '13px 16px', verticalAlign: 'middle' }}>
-                        <div style={{ fontSize: 13, color: '#555' }}>{inf.tt_usuario || '—'}</div>
-                        <div style={{ fontSize: 11, color: '#AAA' }}>{inf.tt_seguidores ? fmtSeg(inf.tt_seguidores) + ' seg.' : ''}</div>
+                        <ProfileLink username={inf.tt_usuario} link={inf.tt_link} platform="tt" />
+                        <div style={{ fontSize: 11, color: '#AAA', marginTop: 1 }}>
+                          {inf.tt_seguidores ? fmtSeg(inf.tt_seguidores) + ' seg.' : ''}
+                        </div>
                       </td>
-                      <td style={{ padding: '13px 16px', verticalAlign: 'middle', fontWeight: 500, fontSize: 13 }}>{fmtSeg(total)}</td>
+                      <td style={{ padding: '13px 16px', verticalAlign: 'middle', fontWeight: 500, fontSize: 13 }}>
+                        {fmtSeg(total)}
+                      </td>
                       <td style={{ padding: '13px 16px', verticalAlign: 'middle' }}>
                         <span style={{ background: tc.bg, color: tc.color, padding: '2px 9px', borderRadius: 20, fontSize: 11 }}>
                           {inf.tipo_contenido}
@@ -197,7 +216,8 @@ export default function VistaCliente({ token }) {
               </tbody>
             </table>
           </div>
-          {/* Footer totales */}
+
+          {/* Footer */}
           <div style={{ padding: '14px 16px', background: '#F7F7F5', borderTop: '0.5px solid #E5E5E2', display: 'flex', justifyContent: 'flex-end', gap: 24 }}>
             <div style={{ textAlign: 'right' }}>
               <div style={{ fontSize: 10.5, color: '#AAA', textTransform: 'uppercase', letterSpacing: '.07em' }}>Total influencers</div>
