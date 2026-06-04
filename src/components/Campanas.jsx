@@ -19,11 +19,11 @@ const TIPO_COLORS = {
 }
 
 const SIZE_RANGES = [
-  { label: 'Nano',  min: 0,       max: 10000,    bg: '#F1EFE8', color: '#5F5E5A' },
-  { label: 'Micro', min: 10000,   max: 150000,   bg: '#E6F1FB', color: '#0C447C' },
-  { label: 'Mid',   min: 150000,  max: 750000,   bg: '#EEEDFE', color: '#3C3489' },
-  { label: 'Macro', min: 750000,  max: 4000000,  bg: '#EAF3DE', color: '#27500A' },
-  { label: 'Mega',  min: 4000000, max: Infinity, bg: '#FAEEDA', color: '#633806' },
+  { label: 'Nano',  min: 0,       max: 10000 },
+  { label: 'Micro', min: 10000,   max: 150000 },
+  { label: 'Mid',   min: 150000,  max: 750000 },
+  { label: 'Macro', min: 750000,  max: 4000000 },
+  { label: 'Mega',  min: 4000000, max: Infinity },
 ]
 
 function getSize(n) {
@@ -34,12 +34,12 @@ function getSize(n) {
 const ESTADOS_INF = ['Contactado', 'Negociando', 'Confirmado', 'Brief enviado', 'Contenido recibido', 'Publicado']
 
 const ESTADO_INF_COLORS = {
-  Contactado:          { bg: '#F1EFE8', color: '#5F5E5A' },
-  Negociando:          { bg: '#FAEEDA', color: '#633806' },
-  Confirmado:          { bg: '#E1F5EE', color: '#085041' },
-  'Brief enviado':     { bg: '#E6F1FB', color: '#0C447C' },
-  'Contenido recibido':{ bg: '#EEEDFE', color: '#3C3489' },
-  Publicado:           { bg: '#EAF3DE', color: '#27500A' },
+  Contactado:           { bg: '#F1EFE8', color: '#5F5E5A' },
+  Negociando:           { bg: '#FAEEDA', color: '#633806' },
+  Confirmado:           { bg: '#E1F5EE', color: '#085041' },
+  'Brief enviado':      { bg: '#E6F1FB', color: '#0C447C' },
+  'Contenido recibido': { bg: '#EEEDFE', color: '#3C3489' },
+  Publicado:            { bg: '#EAF3DE', color: '#27500A' },
 }
 
 const ESTADO_CAMP_COLORS = {
@@ -156,7 +156,7 @@ function BudgetSummary({ camp }) {
 }
 
 const EMPTY_CAMP = { nombre: '', cliente: '', budget: '', moneda: 'CLP', brief: '', plataforma: 'Ambas' }
-const EMPTY_CI = { costo: '', piezas: '1', estado: 'Contactado', notas: '', video_link: '' }
+const EMPTY_CI = { costo: '', piezas: '1', estado: 'Contactado', notas: '', video_link_tt: '', video_link_ig: '' }
 
 export default function Campanas() {
   const [camps, setCamps] = useState([])
@@ -195,7 +195,8 @@ export default function Campanas() {
           c.*,
           ci.id AS ci_id, ci.costo, ci.piezas,
           ci.estado AS ci_estado, ci.notas AS ci_notas,
-          ci.video_link, ci.influencer_id,
+          ci.video_link_tt, ci.video_link_ig,
+          ci.influencer_id,
           i.nombre AS inf_nombre,
           i.ig_usuario, i.ig_seguidores,
           i.tt_usuario, i.tt_seguidores,
@@ -222,7 +223,8 @@ export default function Campanas() {
             ci_id: row.ci_id, influencer_id: row.influencer_id,
             costo: row.costo, piezas: row.piezas,
             ci_estado: row.ci_estado, ci_notas: row.ci_notas,
-            video_link: row.video_link || '',
+            video_link_tt: row.video_link_tt || '',
+            video_link_ig: row.video_link_ig || '',
             nombre: row.inf_nombre,
             ig_usuario: row.ig_usuario, ig_seguidores: row.ig_seguidores,
             tt_usuario: row.tt_usuario, tt_seguidores: row.tt_seguidores,
@@ -292,12 +294,13 @@ export default function Campanas() {
     setSavingCI(true)
     try {
       await sql`
-        INSERT INTO campaign_influencers (campaign_id, influencer_id, costo, piezas, estado, notas, video_link)
+        INSERT INTO campaign_influencers (campaign_id, influencer_id, costo, piezas, estado, notas, video_link_tt, video_link_ig)
         VALUES (
           ${currentCamp.id}, ${selInf.id},
           ${parseInt(ciForm.costo) || 0},
           ${parseInt(ciForm.piezas) || 1},
-          ${ciForm.estado}, ${ciForm.notas}, ${ciForm.video_link}
+          ${ciForm.estado}, ${ciForm.notas},
+          ${ciForm.video_link_tt}, ${ciForm.video_link_ig}
         )
       `
       setModalAddInf(false)
@@ -319,7 +322,8 @@ export default function Campanas() {
     setEditCIForm({
       costo: inf.costo, piezas: inf.piezas,
       estado: inf.ci_estado, notas: inf.ci_notas || '',
-      video_link: inf.video_link || '',
+      video_link_tt: inf.video_link_tt || '',
+      video_link_ig: inf.video_link_ig || '',
     })
     setEditCIModal(true)
   }
@@ -332,7 +336,8 @@ export default function Campanas() {
           piezas = ${parseInt(editCIForm.piezas) || 1},
           estado = ${editCIForm.estado},
           notas = ${editCIForm.notas},
-          video_link = ${editCIForm.video_link}
+          video_link_tt = ${editCIForm.video_link_tt},
+          video_link_ig = ${editCIForm.video_link_ig}
         WHERE id = ${editCI.ci_id}
       `
       setEditCIModal(false)
@@ -364,6 +369,60 @@ export default function Campanas() {
   const plat = currentCamp?.plataforma || 'Ambas'
   const showIG = plat === 'Ambas' || plat === 'Instagram'
   const showTT = plat === 'Ambas' || plat === 'TikTok'
+  const showBothPlat = plat === 'Ambas'
+
+  // Video link fields según plataforma
+  function VideoLinkFields({ form, setForm }) {
+    return (
+      <>
+        {showTT && (
+          <div className="fg">
+            <label className="label">Link video TikTok</label>
+            <input className="input" value={form.video_link_tt}
+              onChange={e => setForm(f => ({ ...f, video_link_tt: e.target.value }))}
+              placeholder="https://tiktok.com/..." />
+          </div>
+        )}
+        {showIG && (
+          <div className="fg">
+            <label className="label">Link post Instagram</label>
+            <input className="input" value={form.video_link_ig}
+              onChange={e => setForm(f => ({ ...f, video_link_ig: e.target.value }))}
+              placeholder="https://instagram.com/p/..." />
+          </div>
+        )}
+      </>
+    )
+  }
+
+  // Celda de videos en tabla
+  function VideoCell({ inf }) {
+    const hasTT = inf.video_link_tt
+    const hasIG = inf.video_link_ig
+    if (!hasTT && !hasIG) return <span style={{ color: '#CCC', fontSize: 12 }}>—</span>
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+        {showTT && hasTT && (
+          <a href={hasTT} target="_blank" rel="noopener noreferrer"
+            style={{ color: '#1A1A1A', fontSize: 11.5, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 3 }}
+            onMouseEnter={e => e.currentTarget.style.textDecoration = 'underline'}
+            onMouseLeave={e => e.currentTarget.style.textDecoration = 'none'}
+          >
+            <span style={{ fontSize: 10, background: '#F0F0EE', padding: '1px 5px', borderRadius: 4 }}>TT</span> Ver ↗
+          </a>
+        )}
+        {showIG && hasIG && (
+          <a href={hasIG} target="_blank" rel="noopener noreferrer"
+            style={{ color: '#C2185B', fontSize: 11.5, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 3 }}
+            onMouseEnter={e => e.currentTarget.style.textDecoration = 'underline'}
+            onMouseLeave={e => e.currentTarget.style.textDecoration = 'none'}
+          >
+            <span style={{ fontSize: 10, background: '#FEF0FB', color: '#6B1560', padding: '1px 5px', borderRadius: 4 }}>IG</span> Ver ↗
+          </a>
+        )}
+      </div>
+    )
+  }
 
   if (loading) return <div style={{ padding: 40, color: '#AAA', fontSize: 13 }}>Cargando...</div>
 
@@ -385,7 +444,13 @@ export default function Campanas() {
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <button className="btn-ghost" onClick={() => setChangeEstadoModal(true)}>Cambiar estado</button>
-            {!isReadOnly && <button className="btn-red" onClick={() => { setSelInf(null); setCiForm(EMPTY_CI); setInfSearch(''); setInfFilterTipo(''); setInfFilterSize(''); setModalAddInf(true) }}>+ Agregar influencer</button>}
+            {!isReadOnly && (
+              <button className="btn-red" onClick={() => {
+                setSelInf(null); setCiForm(EMPTY_CI)
+                setInfSearch(''); setInfFilterTipo(''); setInfFilterSize('')
+                setModalAddInf(true)
+              }}>+ Agregar influencer</button>
+            )}
           </div>
         </div>
 
@@ -421,11 +486,13 @@ export default function Campanas() {
                     <th className="th" style={{ width: 180 }}>Influencer</th>
                     {showIG && <th className="th" style={{ width: 100 }}>Instagram</th>}
                     {showTT && <th className="th" style={{ width: 100 }}>TikTok</th>}
-                    <th className="th" style={{ width: 90 }}>Categorías</th>
+                    <th className="th" style={{ width: 110 }}>Categorías</th>
                     <th className="th" style={{ width: 90 }}>Costo</th>
                     <th className="th" style={{ width: 50 }}>Piezas</th>
                     <th className="th" style={{ width: 120 }}>Estado</th>
-                    <th className="th" style={{ width: 80 }}>Video</th>
+                    <th className="th" style={{ width: showBothPlat ? 100 : 70 }}>
+                      {showBothPlat ? 'Videos' : 'Video'}
+                    </th>
                     {!isReadOnly && <th className="th" style={{ width: 70 }}></th>}
                   </tr>
                 </thead>
@@ -440,21 +507,19 @@ export default function Campanas() {
                         <td className="td">
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                             <Avatar nombre={inf.nombre} index={i} />
-                            <div>
-                              <div style={{ fontWeight: 500, fontSize: 13 }}>{inf.nombre}</div>
-                            </div>
+                            <div style={{ fontWeight: 500, fontSize: 13 }}>{inf.nombre}</div>
                           </div>
                         </td>
                         {showIG && (
                           <td className="td">
                             <div style={{ fontSize: 12.5, color: '#555' }}>{fmtSeg(inf.ig_seguidores)}</div>
-                            <span style={{ background: igSize.bg, color: igSize.color, padding: '0px 6px', borderRadius: 20, fontSize: 10 }}>{igSize.label}</span>
+                            <span style={{ background: igSize.bg, color: igSize.color, padding: '0 6px', borderRadius: 20, fontSize: 10 }}>{igSize.label}</span>
                           </td>
                         )}
                         {showTT && (
                           <td className="td">
                             <div style={{ fontSize: 12.5, color: '#555' }}>{fmtSeg(inf.tt_seguidores)}</div>
-                            <span style={{ background: ttSize.bg, color: ttSize.color, padding: '0px 6px', borderRadius: 20, fontSize: 10 }}>{ttSize.label}</span>
+                            <span style={{ background: ttSize.bg, color: ttSize.color, padding: '0 6px', borderRadius: 20, fontSize: 10 }}>{ttSize.label}</span>
                           </td>
                         )}
                         <td className="td">
@@ -471,17 +536,7 @@ export default function Campanas() {
                         <td className="td">
                           <span style={{ background: ec.bg, color: ec.color, padding: '2px 8px', borderRadius: 20, fontSize: 11 }}>{inf.ci_estado}</span>
                         </td>
-                        <td className="td">
-                          {inf.video_link ? (
-                            <a href={inf.video_link} target="_blank" rel="noopener noreferrer"
-                              style={{ color: '#E8313A', fontSize: 12, textDecoration: 'none' }}
-                              onMouseEnter={e => e.target.style.textDecoration = 'underline'}
-                              onMouseLeave={e => e.target.style.textDecoration = 'none'}
-                            >Ver ↗</a>
-                          ) : (
-                            <span style={{ color: '#CCC', fontSize: 12 }}>—</span>
-                          )}
-                        </td>
+                        <td className="td"><VideoCell inf={inf} /></td>
                         {!isReadOnly && (
                           <td className="td">
                             <div style={{ display: 'flex', gap: 4 }}>
@@ -511,7 +566,7 @@ export default function Campanas() {
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                     padding: '10px 14px', borderRadius: 8, cursor: 'pointer',
                     border: `0.5px solid ${ec.bg}`, background: '#fff',
-                    fontSize: 13, fontFamily: 'inherit', transition: 'all .12s',
+                    fontSize: 13, fontFamily: 'inherit',
                   }}
                   onMouseEnter={e => e.currentTarget.style.background = ec.bg}
                   onMouseLeave={e => e.currentTarget.style.background = '#fff'}
@@ -533,18 +588,19 @@ export default function Campanas() {
         <Modal open={modalAddInf} onClose={() => setModalAddInf(false)} title="Agregar influencer">
           <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
             <input className="input" placeholder="Buscar..." value={infSearch}
-              onChange={e => { setInfSearch(e.target.value); setSelInf(null) }}
-              style={{ flex: 1 }} />
-            <select className="input" style={{ width: 120 }} value={infFilterTipo} onChange={e => { setInfFilterTipo(e.target.value); setSelInf(null) }}>
+              onChange={e => { setInfSearch(e.target.value); setSelInf(null) }} style={{ flex: 1 }} />
+            <select className="input" style={{ width: 120 }} value={infFilterTipo}
+              onChange={e => { setInfFilterTipo(e.target.value); setSelInf(null) }}>
               <option value="">Categoría</option>
               {TIPOS.map(t => <option key={t}>{t}</option>)}
             </select>
-            <select className="input" style={{ width: 100 }} value={infFilterSize} onChange={e => { setInfFilterSize(e.target.value); setSelInf(null) }}>
+            <select className="input" style={{ width: 100 }} value={infFilterSize}
+              onChange={e => { setInfFilterSize(e.target.value); setSelInf(null) }}>
               <option value="">Tamaño</option>
               {SIZE_RANGES.map(s => <option key={s.label}>{s.label}</option>)}
             </select>
           </div>
-          <div style={{ border: '0.5px solid #E5E5E2', borderRadius: 8, maxHeight: 240, overflowY: 'auto', marginBottom: 14 }}>
+          <div style={{ border: '0.5px solid #E5E5E2', borderRadius: 8, maxHeight: 220, overflowY: 'auto', marginBottom: 14 }}>
             {availableInfs.length === 0 ? (
               <div style={{ padding: 16, textAlign: 'center', color: '#AAA', fontSize: 12 }}>Sin resultados</div>
             ) : availableInfs.map((inf, i) => {
@@ -554,9 +610,8 @@ export default function Campanas() {
               return (
                 <div key={inf.id} onClick={() => setSelInf(inf)}
                   style={{
-                    display: 'flex', alignItems: 'center', gap: 10,
-                    padding: '9px 12px', cursor: 'pointer',
-                    borderBottom: '0.5px solid #F0F0EE',
+                    display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px',
+                    cursor: 'pointer', borderBottom: '0.5px solid #F0F0EE',
                     background: selInf?.id === inf.id ? '#FCEBEB' : 'transparent',
                   }}
                 >
@@ -602,6 +657,7 @@ export default function Campanas() {
                   {ESTADOS_INF.map(e => <option key={e}>{e}</option>)}
                 </select>
               </div>
+              <VideoLinkFields form={ciForm} setForm={setCiForm} />
               <div className="fg">
                 <label className="label">Notas internas</label>
                 <textarea className="input" rows={2} value={ciForm.notas} onChange={e => setCiForm(f => ({ ...f, notas: e.target.value }))} style={{ resize: 'vertical' }} />
@@ -616,7 +672,7 @@ export default function Campanas() {
           </div>
         </Modal>
 
-        {/* Modal editar influencer en campaña */}
+        {/* Modal editar influencer */}
         <Modal open={editCIModal} onClose={() => setEditCIModal(false)} title={`Editar — ${editCI?.nombre}`}>
           <div className="form-row-2">
             <div className="fg">
@@ -634,10 +690,7 @@ export default function Campanas() {
               {ESTADOS_INF.map(e => <option key={e}>{e}</option>)}
             </select>
           </div>
-          <div className="fg">
-            <label className="label">Link del video / post</label>
-            <input className="input" value={editCIForm.video_link} onChange={e => setEditCIForm(f => ({ ...f, video_link: e.target.value }))} placeholder="https://tiktok.com/..." />
-          </div>
+          <VideoLinkFields form={editCIForm} setForm={setEditCIForm} />
           <div className="fg">
             <label className="label">Notas internas</label>
             <textarea className="input" rows={2} value={editCIForm.notas} onChange={e => setEditCIForm(f => ({ ...f, notas: e.target.value }))} style={{ resize: 'vertical' }} />
@@ -675,7 +728,7 @@ export default function Campanas() {
           return (
             <div key={t} onClick={() => setTab(t)} style={{
               padding: '6px 14px', borderRadius: 8, cursor: 'pointer',
-              fontSize: 12.5, transition: 'all .12s', display: 'flex', alignItems: 'center', gap: 5,
+              fontSize: 12.5, display: 'flex', alignItems: 'center', gap: 5,
               background: tab === t ? '#fff' : 'transparent',
               color: tab === t ? '#1A1A1A' : '#888',
               boxShadow: tab === t ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
@@ -712,7 +765,7 @@ export default function Campanas() {
                     <button className="btn-icon btn-icon-danger" onClick={e => { e.stopPropagation(); setDeleteCampId(camp.id) }}>✕</button>
                   </div>
                 </div>
-                <div style={{ fontSize: 12, color: '#888', marginBottom: 4 }}>{camp.cliente}</div>
+                <div style={{ fontSize: 12, color: '#888', marginBottom: 2 }}>{camp.cliente}</div>
                 <div style={{ fontSize: 11, color: '#AAA', marginBottom: 10 }}>{camp.plataforma || 'Ambas'}</div>
                 <div style={{ display: 'flex', gap: 14, marginBottom: 4 }}>
                   <div><div style={{ fontSize: 10.5, color: '#AAA' }}>Influencers</div><div style={{ fontSize: 15, fontWeight: 500 }}>{camp.influencers.length}</div></div>
