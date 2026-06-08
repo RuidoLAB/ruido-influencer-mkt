@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import sql from '../lib/db'
 import Modal from './Modal'
+import ImportarCSV from './ImportarCSV'
 
 const TIPOS = ['Bailes', 'Reviewers', 'Humor', 'Lifestyle', 'Música', 'Gaming', 'Moda', 'Fitness', 'Viajes', 'Otros']
 
@@ -73,15 +74,6 @@ function UserLink({ username, link }) {
     >{username} ↗</a>
   )
   return <span style={{ fontSize: 12.5, color: '#555' }}>{username}</span>
-}
-
-function SizeBadge({ n, label }) {
-  const s = getSize(n)
-  return (
-    <span style={{ background: s.bg, color: s.color, padding: '1px 7px', borderRadius: 20, fontSize: 10.5 }}>
-      {s.label} {label && <span style={{ opacity: 0.7 }}>· {label}</span>}
-    </span>
-  )
 }
 
 function TiposBadges({ tipos }) {
@@ -210,8 +202,15 @@ export default function Roster() {
         `
       } else {
         await sql`
-          INSERT INTO influencers (nombre, ig_usuario, ig_seguidores, ig_link, tt_usuario, tt_seguidores, tt_link, tipos_contenido, estado, notas)
-          VALUES (${form.nombre}, ${form.ig_usuario}, ${ig_seg}, ${form.ig_link}, ${form.tt_usuario}, ${tt_seg}, ${form.tt_link}, ${form.tipos_contenido}, ${form.estado}, ${form.notas})
+          INSERT INTO influencers (
+            nombre, ig_usuario, ig_seguidores, ig_link,
+            tt_usuario, tt_seguidores, tt_link,
+            tipos_contenido, estado, notas
+          ) VALUES (
+            ${form.nombre}, ${form.ig_usuario}, ${ig_seg}, ${form.ig_link},
+            ${form.tt_usuario}, ${tt_seg}, ${form.tt_link},
+            ${form.tipos_contenido}, ${form.estado}, ${form.notas}
+          )
         `
       }
       setModalOpen(false)
@@ -231,7 +230,8 @@ export default function Roster() {
   const filtered = influencers
     .filter(i => {
       const q = search.toLowerCase()
-      const matchSearch = !q || i.nombre.toLowerCase().includes(q) ||
+      const matchSearch = !q ||
+        i.nombre.toLowerCase().includes(q) ||
         (i.ig_usuario || '').toLowerCase().includes(q) ||
         (i.tt_usuario || '').toLowerCase().includes(q)
       const tipos = i.tipos_contenido || []
@@ -250,6 +250,8 @@ export default function Roster() {
 
   return (
     <div style={{ padding: '20px 24px' }}>
+
+      {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
         <div>
           <h1 style={{ fontSize: 20, fontWeight: 500 }}>Roster</h1>
@@ -257,13 +259,19 @@ export default function Roster() {
             {influencers.length} influencers · {influencers.filter(i => i.estado === 'Activo').length} activos
           </p>
         </div>
-        <button className="btn-red" onClick={openNew}>+ Nuevo influencer</button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <ImportarCSV onDone={fetchInfluencers} />
+          <button className="btn-red" onClick={openNew}>+ Nuevo influencer</button>
+        </div>
       </div>
 
+      {/* Toolbar */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
         <input
-          className="input" placeholder="Buscar nombre o usuario..."
-          value={search} onChange={e => setSearch(e.target.value)}
+          className="input"
+          placeholder="Buscar nombre o usuario..."
+          value={search}
+          onChange={e => setSearch(e.target.value)}
           style={{ minWidth: 220, flex: 1, maxWidth: 300 }}
         />
         <select className="input" value={filterTipo} onChange={e => setFilterTipo(e.target.value)}>
@@ -281,12 +289,15 @@ export default function Roster() {
         </select>
       </div>
 
+      {/* Tabla */}
       <div className="card" style={{ overflow: 'hidden' }}>
         {loading ? (
           <div style={{ padding: 40, textAlign: 'center', color: '#AAA', fontSize: 13 }}>Cargando...</div>
         ) : filtered.length === 0 ? (
           <div style={{ padding: 40, textAlign: 'center', color: '#AAA', fontSize: 13 }}>
-            {search || filterTipo || filterEstado || filterSize ? 'Sin resultados para ese filtro' : 'Aún no hay influencers. Agrega el primero.'}
+            {search || filterTipo || filterEstado || filterSize
+              ? 'Sin resultados para ese filtro'
+              : 'Aún no hay influencers. Agrega el primero o importa un CSV.'}
           </div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
@@ -296,10 +307,14 @@ export default function Roster() {
                   <th className="th" style={{ width: 200 }}>Influencer</th>
                   <th className="th" style={{ width: 160 }}>Instagram</th>
                   <th className="th" style={{ width: 160 }}>TikTok</th>
-                  <th className="th" style={{ width: 110, cursor: 'pointer', userSelect: 'none' }} onClick={() => setSortAsc(s => !s)}>
+                  <th
+                    className="th"
+                    style={{ width: 110, cursor: 'pointer', userSelect: 'none' }}
+                    onClick={() => setSortAsc(s => !s)}
+                  >
                     Total seg. {sortAsc ? '↑' : '↓'}
                   </th>
-                  <th className="th" style={{ width: 180 }}>Categorías</th>
+                  <th className="th" style={{ width: 200 }}>Categorías</th>
                   <th className="th" style={{ width: 80 }}>Estado</th>
                   <th className="th" style={{ width: 70 }}></th>
                 </tr>
@@ -321,7 +336,7 @@ export default function Roster() {
                         {inf.ig_seguidores > 0 && (
                           <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 3 }}>
                             <span style={{ fontSize: 11, color: '#AAA' }}>{fmtSeg(inf.ig_seguidores)}</span>
-                            <span style={{ background: igSize.bg, color: igSize.color, padding: '0px 6px', borderRadius: 20, fontSize: 10 }}>
+                            <span style={{ background: igSize.bg, color: igSize.color, padding: '0 6px', borderRadius: 20, fontSize: 10 }}>
                               {igSize.label}
                             </span>
                           </div>
@@ -332,7 +347,7 @@ export default function Roster() {
                         {inf.tt_seguidores > 0 && (
                           <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 3 }}>
                             <span style={{ fontSize: 11, color: '#AAA' }}>{fmtSeg(inf.tt_seguidores)}</span>
-                            <span style={{ background: ttSize.bg, color: ttSize.color, padding: '0px 6px', borderRadius: 20, fontSize: 10 }}>
+                            <span style={{ background: ttSize.bg, color: ttSize.color, padding: '0 6px', borderRadius: 20, fontSize: 10 }}>
                               {ttSize.label}
                             </span>
                           </div>
@@ -368,38 +383,53 @@ export default function Roster() {
         )}
       </div>
 
+      {/* Modal crear/editar */}
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editId ? 'Editar influencer' : 'Nuevo influencer'}>
         <div className="fg">
           <label className="label">Nombre</label>
-          <input className="input" value={form.nombre} onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))} placeholder="Nombre completo" />
+          <input className="input" value={form.nombre}
+            onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))}
+            placeholder="Nombre completo" />
         </div>
         <div className="form-row-2">
           <div className="fg">
             <label className="label">Usuario Instagram</label>
-            <input className="input" value={form.ig_usuario} onChange={e => setForm(f => ({ ...f, ig_usuario: e.target.value }))} placeholder="@usuario" />
+            <input className="input" value={form.ig_usuario}
+              onChange={e => setForm(f => ({ ...f, ig_usuario: e.target.value }))}
+              placeholder="@usuario" />
           </div>
           <div className="fg">
             <label className="label">Seguidores Instagram</label>
-            <input className="input" type="number" value={form.ig_seguidores} onChange={e => setForm(f => ({ ...f, ig_seguidores: e.target.value }))} placeholder="0" />
+            <input className="input" type="number" value={form.ig_seguidores}
+              onChange={e => setForm(f => ({ ...f, ig_seguidores: e.target.value }))}
+              placeholder="0" />
           </div>
         </div>
         <div className="fg">
           <label className="label">Link Instagram</label>
-          <input className="input" value={form.ig_link} onChange={e => setForm(f => ({ ...f, ig_link: e.target.value }))} placeholder="https://instagram.com/usuario" />
+          <input className="input" value={form.ig_link}
+            onChange={e => setForm(f => ({ ...f, ig_link: e.target.value }))}
+            placeholder="https://instagram.com/usuario" />
         </div>
         <div className="form-row-2">
           <div className="fg">
             <label className="label">Usuario TikTok</label>
-            <input className="input" value={form.tt_usuario} onChange={e => setForm(f => ({ ...f, tt_usuario: e.target.value }))} placeholder="@usuario" />
+            <input className="input" value={form.tt_usuario}
+              onChange={e => setForm(f => ({ ...f, tt_usuario: e.target.value }))}
+              placeholder="@usuario" />
           </div>
           <div className="fg">
             <label className="label">Seguidores TikTok</label>
-            <input className="input" type="number" value={form.tt_seguidores} onChange={e => setForm(f => ({ ...f, tt_seguidores: e.target.value }))} placeholder="0" />
+            <input className="input" type="number" value={form.tt_seguidores}
+              onChange={e => setForm(f => ({ ...f, tt_seguidores: e.target.value }))}
+              placeholder="0" />
           </div>
         </div>
         <div className="fg">
           <label className="label">Link TikTok</label>
-          <input className="input" value={form.tt_link} onChange={e => setForm(f => ({ ...f, tt_link: e.target.value }))} placeholder="https://tiktok.com/@usuario" />
+          <input className="input" value={form.tt_link}
+            onChange={e => setForm(f => ({ ...f, tt_link: e.target.value }))}
+            placeholder="https://tiktok.com/@usuario" />
         </div>
         <div className="fg">
           <label className="label">Categorías de contenido</label>
@@ -413,14 +443,18 @@ export default function Roster() {
         </div>
         <div className="fg">
           <label className="label">Estado</label>
-          <select className="input" value={form.estado} onChange={e => setForm(f => ({ ...f, estado: e.target.value }))}>
+          <select className="input" value={form.estado}
+            onChange={e => setForm(f => ({ ...f, estado: e.target.value }))}>
             <option>Activo</option>
             <option>Inactivo</option>
           </select>
         </div>
         <div className="fg">
           <label className="label">Notas internas</label>
-          <textarea className="input" rows={2} value={form.notas} onChange={e => setForm(f => ({ ...f, notas: e.target.value }))} placeholder="Solo visible para el equipo..." style={{ resize: 'vertical' }} />
+          <textarea className="input" rows={2} value={form.notas}
+            onChange={e => setForm(f => ({ ...f, notas: e.target.value }))}
+            placeholder="Solo visible para el equipo..."
+            style={{ resize: 'vertical' }} />
         </div>
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
           <button className="btn-ghost" onClick={() => setModalOpen(false)}>Cancelar</button>
@@ -430,8 +464,11 @@ export default function Roster() {
         </div>
       </Modal>
 
+      {/* Modal confirmar eliminar */}
       <Modal open={!!deleteId} onClose={() => setDeleteId(null)} title="Eliminar influencer">
-        <p style={{ fontSize: 13, color: '#555', marginBottom: 20 }}>¿Estás segura? Esta acción no se puede deshacer.</p>
+        <p style={{ fontSize: 13, color: '#555', marginBottom: 20 }}>
+          ¿Estás segura? Esta acción no se puede deshacer.
+        </p>
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
           <button className="btn-ghost" onClick={() => setDeleteId(null)}>Cancelar</button>
           <button className="btn-danger" onClick={() => handleDelete(deleteId)}>Eliminar</button>
