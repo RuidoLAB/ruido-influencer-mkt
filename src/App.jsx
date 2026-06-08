@@ -5,20 +5,21 @@ import Dashboard from './components/Dashboard'
 import Roster from './components/Roster'
 import Campanas from './components/Campanas'
 import VistaCliente from './components/VistaCliente'
+import VistaReporte from './components/VistaReporte'
 import './index.css'
 
 export default function App() {
   const [auth, setAuth] = useState(false)
   const [page, setPage] = useState('dashboard')
   const [publicToken, setPublicToken] = useState(null)
+  const [reportToken, setReportToken] = useState(null)
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const token = params.get('token')
-    if (token) {
-      setPublicToken(token)
-      return
-    }
+    const report = params.get('report')
+    if (token) { setPublicToken(token); return }
+    if (report) { setReportToken(report); return }
     const saved = localStorage.getItem('ruido_auth')
     if (saved === 'true') setAuth(true)
   }, [])
@@ -29,6 +30,7 @@ export default function App() {
   }
 
   if (publicToken) return <VistaCliente token={publicToken} />
+  if (reportToken) return <VistaReporte token={reportToken} />
   if (!auth) return <Login onLogin={() => setAuth(true)} />
 
   return (
