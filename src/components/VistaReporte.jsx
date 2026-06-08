@@ -1,0 +1,447 @@
+import { useState, useEffect } from 'react'
+import sql from '../lib/db'
+
+const AV_COLORS = [
+  { bg: '#FDDADA', color: '#C0392B' },
+  { bg: '#E6EEFF', color: '#3B5BDB' },
+  { bg: '#E1F5EE', color: '#1D9E75' },
+  { bg: '#F3E8FF', color: '#7C3AED' },
+  { bg: '#FFF3CD', color: '#BA7517' },
+  { bg: '#FDE8F0', color: '#C2185B' },
+  { bg: '#D4F4FF', color: '#0369A1' },
+  { bg: '#E8F5E9', color: '#2E7D32' },
+]
+
+const TIPO_COLORS = {
+  Bailes:    { bg: '#EEEDFE', color: '#3C3489' },
+  Reviewers: { bg: '#E6F1FB', color: '#0C447C' },
+  Humor:     { bg: '#FAEEDA', color: '#633806' },
+  Lifestyle: { bg: '#E1F5EE', color: '#085041' },
+  Música:    { bg: '#FAECE7', color: '#712B13' },
+  Gaming:    { bg: '#FBEAF0', color: '#72243E' },
+  Moda:      { bg: '#FEF0FB', color: '#6B1560' },
+  Fitness:   { bg: '#E8F5E9', color: '#1B5E20' },
+  Viajes:    { bg: '#E3F2FD', color: '#0D47A1' },
+  Otros:     { bg: '#F1EFE8', color: '#444441' },
+}
+
+function fmtNum(n) {
+  n = Number(n) || 0
+  if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M'
+  if (n >= 1000) return Math.round(n / 1000) + 'K'
+  return n.toLocaleString('es-CL')
+}
+
+function fmtSeg(n) {
+  n = Number(n)
+  if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M'
+  if (n >= 1000) return Math.round(n / 1000) + 'K'
+  return n.toLocaleString('es-CL')
+}
+
+function Avatar({ nombre, index, size = 32 }) {
+  const c = AV_COLORS[index % AV_COLORS.length]
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: '50%',
+      background: c.bg, color: c.color,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontSize: size * 0.38, fontWeight: 500, flexShrink: 0,
+      border: '0.5px solid rgba(0,0,0,0.06)',
+    }}>{nombre?.[0]?.toUpperCase()}</div>
+  )
+}
+
+function StatCard({ label, value, sub }) {
+  return (
+    <div style={{
+      background: 'rgba(255,255,255,0.05)', border: '0.5px solid rgba(255,255,255,0.1)',
+      borderRadius: 12, padding: '16px 18px',
+    }}>
+      <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 6 }}>{label}</div>
+      <div style={{ fontSize: 24, fontWeight: 500, color: '#fff' }}>{value}</div>
+      {sub && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 3 }}>{sub}</div>}
+    </div>
+  )
+}
+
+function MetricPill({ label, value, good }) {
+  return (
+    <div style={{
+      background: '#F7F7F5', border: '0.5px solid #E5E5E2',
+      borderRadius: 10, padding: '12px 14px', textAlign: 'center',
+    }}>
+      <div style={{ fontSize: 18, fontWeight: 500, color: good ? '#3B6D11' : '#1A1A1A' }}>{value}</div>
+      <div style={{ fontSize: 11, color: '#AAA', marginTop: 3, textTransform: 'uppercase', letterSpacing: '.06em' }}>{label}</div>
+    </div>
+  )
+}
+
+export default function VistaReporte({ token }) {
+  const [data, setData] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [activeTab, setActiveTab] = useState('resumen')
+
+  useEffect(() => { if (token) fetchReport(token) }, [token])
+
+  async function fetchReport(t) {
+    setLoading(true)
+    try {
+      // Verificar token
+      const tokenData = await sql`
+        SELECT rt.*, c.nombre AS camp_nombre, c.cliente, c.plataforma
+        FROM report_tokens rt
+        JOIN campaigns c ON c.id = rt.campaign_id
+        WHERE rt.token = ${t} AND rt.activo = true
+        LIMIT 1
+      `
+      if (tokenData.length === 0) {
+        const check = await sql`SELECT id FROM report_tokens WHERE token = ${t}`
+        setError(check.length === 0 ? 'not_found' : 'inactive')
+        setLoading(false)
+        return
+      }
+
+      const campInfo = tokenData[0]
+
+      // Traer posts con métricas e influencers
+      const postsData = await sql`
+        SELECT
+          p.*,
+          i.nombre AS inf_nombre,
+          i.ig_usuario, i.tt_usuario,
+          i.ig_seguidores, i.tt_seguidores,
+          i.tipos_contenido,
+          pm.id AS pm_id,
+          pm.views, pm.likes, pm.comentarios,
+          pm.shares, pm.saves, pm.engagement_rate,
+          pm.fecha_registro, pm.fuente
+        FROM posts p
+        JOIN influencers i ON i.id = p.influencer_id
+        LEFT JOIN post_metrics pm ON pm.post_id = p.id
+        WHERE p.campaign_id = ${campInfo.campaign_id}
+        ORDER BY p.fecha_publicacion DESC NULLS LAST
+      `
+
+      // Agrupar por post
+      const grouped = {}
+      postsData.forEach(row => {
+        if (!grouped[row.id]) {
+          grouped[row.id] = {
+            id: row.id, plataforma: row.plataforma, url: row.url,
+            fecha_publicacion: row.fecha_publicacion,
+            inf_nombre: row.inf_nombre,
+            ig_usuario: row.ig_usuario, tt_usuario: row.tt_usuario,
+            ig_seguidores: row.ig_seguidores, tt_seguidores: row.tt_seguidores,
+            tipos_contenido: row.tipos_contenido || [],
+            influencer_id: row.influencer_id,
+            metrics: [],
+          }
+        }
+        if (row.pm_id) {
+          grouped[row.id].metrics.push({
+            id: row.pm_id,
+            views: Number(row.views), likes: Number(row.likes),
+            comentarios: Number(row.comentarios), shares: Number(row.shares),
+            saves: Number(row.saves), engagement_rate: Number(row.engagement_rate),
+            fecha_registro: row.fecha_registro,
+          })
+        }
+      })
+
+      const posts = Object.values(grouped).map(p => ({
+        ...p,
+        latest: p.metrics.sort((a, b) => new Date(b.fecha_registro) - new Date(a.fecha_registro))[0] || null,
+      }))
+
+      setData({ camp: campInfo, posts })
+    } catch (e) { console.error(e); setError('error') }
+    setLoading(false)
+  }
+
+  if (loading) return (
+    <div style={{ minHeight: '100vh', background: '#F7F7F5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ fontSize: 13, color: '#AAA' }}>Cargando reporte...</div>
+    </div>
+  )
+
+  if (error) return (
+    <div style={{ minHeight: '100vh', background: '#F7F7F5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ textAlign: 'center', color: '#AAA' }}>
+        <div style={{ fontSize: 32, marginBottom: 12 }}>◈</div>
+        <div style={{ fontSize: 15, fontWeight: 500, color: '#555', marginBottom: 6 }}>
+          {error === 'not_found' ? 'Reporte no encontrado' : error === 'inactive' ? 'Este reporte ha sido desactivado' : 'Error al cargar'}
+        </div>
+        <div style={{ fontSize: 13 }}>Contacta a tu agencia para obtener acceso.</div>
+      </div>
+    </div>
+  )
+
+  const { camp, posts } = data
+  const postsConMetricas = posts.filter(p => p.latest)
+
+  const totals = postsConMetricas.reduce((acc, p) => ({
+    views: acc.views + p.latest.views,
+    likes: acc.likes + p.latest.likes,
+    comentarios: acc.comentarios + p.latest.comentarios,
+    shares: acc.shares + p.latest.shares,
+    saves: acc.saves + p.latest.saves,
+  }), { views: 0, likes: 0, comentarios: 0, shares: 0, saves: 0 })
+
+  const avgER = postsConMetricas.length > 0
+    ? (postsConMetricas.reduce((s, p) => s + p.latest.engagement_rate, 0) / postsConMetricas.length).toFixed(2)
+    : 0
+
+  // Por influencer
+  const byInf = {}
+  posts.forEach((p, idx) => {
+    if (!byInf[p.influencer_id]) {
+      byInf[p.influencer_id] = {
+        nombre: p.inf_nombre, posts: 0, views: 0, likes: 0,
+        comentarios: 0, shares: 0, saves: 0,
+        tipos_contenido: p.tipos_contenido,
+        index: Object.keys(byInf).length,
+      }
+    }
+    byInf[p.influencer_id].posts++
+    if (p.latest) {
+      byInf[p.influencer_id].views += p.latest.views
+      byInf[p.influencer_id].likes += p.latest.likes
+      byInf[p.influencer_id].comentarios += p.latest.comentarios
+      byInf[p.influencer_id].shares += p.latest.shares
+      byInf[p.influencer_id].saves += p.latest.saves
+    }
+  })
+  const infList = Object.values(byInf).sort((a, b) => b.views - a.views)
+  const maxViews = Math.max(...postsConMetricas.map(p => p.latest.views), 1)
+
+  const thStyle = {
+    padding: '11px 16px', textAlign: 'left', fontSize: 10.5,
+    fontWeight: 500, textTransform: 'uppercase', letterSpacing: '.08em', color: '#AAA',
+    background: '#F7F7F5', borderBottom: '0.5px solid #E5E5E2',
+  }
+  const tdStyle = { padding: '12px 16px', fontSize: 13, verticalAlign: 'middle', borderBottom: '0.5px solid #F0F0EE' }
+
+  return (
+    <div style={{ minHeight: '100vh', background: '#F7F7F5', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+
+      {/* Header */}
+      <div style={{ background: '#111', padding: '28px 40px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+          <div style={{ width: 28, height: 28, background: '#E8313A', borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#fff' }}>R</div>
+          <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', letterSpacing: '.05em' }}>RUIDO LAB — Reporte de campaña</span>
+        </div>
+        <h1 style={{ fontSize: 22, fontWeight: 500, color: '#fff', marginBottom: 4 }}>{camp.camp_nombre}</h1>
+        <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', marginBottom: 24 }}>{camp.cliente}</p>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10 }}>
+          <StatCard label="Publicaciones" value={posts.length} sub={`${infList.length} influencers`} />
+          <StatCard label="Views totales" value={fmtNum(totals.views)} />
+          <StatCard label="Likes totales" value={fmtNum(totals.likes)} />
+          <StatCard label="Comentarios" value={fmtNum(totals.comentarios)} />
+          <StatCard label="Eng. Rate prom." value={avgER + '%'} sub="promedio de posts" />
+        </div>
+      </div>
+
+      <div style={{ padding: '24px 40px' }}>
+
+        {/* Tabs */}
+        <div style={{ display: 'flex', gap: 2, background: '#EBEBEB', borderRadius: 10, padding: 3, marginBottom: 24, width: 'fit-content', border: '0.5px solid #E0E0E0' }}>
+          {['resumen', 'por influencer', 'publicaciones'].map(t => (
+            <div key={t} onClick={() => setActiveTab(t)} style={{
+              padding: '7px 18px', borderRadius: 8, cursor: 'pointer', fontSize: 12.5,
+              background: activeTab === t ? '#fff' : 'transparent',
+              color: activeTab === t ? '#1A1A1A' : '#888',
+              boxShadow: activeTab === t ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+              border: activeTab === t ? '0.5px solid #E5E5E2' : '0.5px solid transparent',
+              textTransform: 'capitalize',
+            }}>{t}</div>
+          ))}
+        </div>
+
+        {/* RESUMEN */}
+        {activeTab === 'resumen' && (
+          <div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 20 }}>
+              <MetricPill label="Shares" value={fmtNum(totals.shares)} />
+              <MetricPill label="Saves" value={fmtNum(totals.saves)} />
+              <MetricPill label="ER promedio" value={avgER + '%'} good={parseFloat(avgER) >= 2} />
+            </div>
+
+            {postsConMetricas.length > 0 && (
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 12 }}>Top posts por views</div>
+                <div style={{ background: '#fff', border: '0.5px solid #E5E5E2', borderRadius: 12, overflow: 'hidden' }}>
+                  {postsConMetricas
+                    .sort((a, b) => b.latest.views - a.latest.views)
+                    .slice(0, 6)
+                    .map((p, i) => {
+                      const pct = Math.round((p.latest.views / maxViews) * 100)
+                      return (
+                        <div key={p.id} style={{
+                          display: 'flex', alignItems: 'center', gap: 14, padding: '13px 18px',
+                          borderBottom: i < 5 ? '0.5px solid #F0F0EE' : 'none',
+                        }}>
+                          <span style={{ fontSize: 11, color: '#CCC', width: 16, flexShrink: 0 }}>{i + 1}</span>
+                          <Avatar nombre={p.inf_nombre} index={i} />
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 5 }}>
+                              <span style={{ fontSize: 13, fontWeight: 500 }}>{p.inf_nombre}</span>
+                              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                                <span style={{ fontSize: 13, fontWeight: 500 }}>{fmtNum(p.latest.views)} views</span>
+                                <span style={{
+                                  fontSize: 10.5, padding: '2px 8px', borderRadius: 20,
+                                  background: p.latest.engagement_rate >= 3 ? '#EAF3DE' : p.latest.engagement_rate >= 1 ? '#FAEEDA' : '#F1EFE8',
+                                  color: p.latest.engagement_rate >= 3 ? '#27500A' : p.latest.engagement_rate >= 1 ? '#633806' : '#5F5E5A',
+                                }}>{p.latest.engagement_rate}% ER</span>
+                                <span style={{
+                                  fontSize: 10.5, padding: '2px 7px', borderRadius: 20,
+                                  background: p.plataforma === 'TikTok' ? '#F0F0EE' : '#FEF0FB',
+                                  color: p.plataforma === 'TikTok' ? '#555' : '#6B1560',
+                                }}>{p.plataforma}</span>
+                              </div>
+                            </div>
+                            <div style={{ height: 4, background: '#F0F0EE', borderRadius: 2, overflow: 'hidden' }}>
+                              <div style={{ height: '100%', width: pct + '%', background: '#E8313A', borderRadius: 2 }} />
+                            </div>
+                          </div>
+                          {p.url && (
+                            <a href={p.url} target="_blank" rel="noopener noreferrer"
+                              style={{ fontSize: 12, color: '#E8313A', textDecoration: 'none', flexShrink: 0 }}>
+                              Ver ↗
+                            </a>
+                          )}
+                        </div>
+                      )
+                    })}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* POR INFLUENCER */}
+        {activeTab === 'por influencer' && (
+          <div style={{ background: '#fff', border: '0.5px solid #E5E5E2', borderRadius: 12, overflow: 'hidden' }}>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr>
+                    <th style={thStyle}>Influencer</th>
+                    <th style={thStyle}>Categorías</th>
+                    <th style={thStyle}>Posts</th>
+                    <th style={thStyle}>Views</th>
+                    <th style={thStyle}>Likes</th>
+                    <th style={thStyle}>Comentarios</th>
+                    <th style={thStyle}>Shares</th>
+                    <th style={thStyle}>Saves</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {infList.map((inf, i) => (
+                    <tr key={i}>
+                      <td style={tdStyle}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <Avatar nombre={inf.nombre} index={inf.index} />
+                          <span style={{ fontWeight: 500 }}>{inf.nombre}</span>
+                        </div>
+                      </td>
+                      <td style={tdStyle}>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+                          {(inf.tipos_contenido || []).slice(0, 2).map(t => {
+                            const c = TIPO_COLORS[t] || TIPO_COLORS['Otros']
+                            return <span key={t} style={{ background: c.bg, color: c.color, padding: '1px 7px', borderRadius: 20, fontSize: 11 }}>{t}</span>
+                          })}
+                        </div>
+                      </td>
+                      <td style={tdStyle}>{inf.posts}</td>
+                      <td style={{ ...tdStyle, fontWeight: 500 }}>{fmtNum(inf.views)}</td>
+                      <td style={tdStyle}>{fmtNum(inf.likes)}</td>
+                      <td style={tdStyle}>{fmtNum(inf.comentarios)}</td>
+                      <td style={tdStyle}>{fmtNum(inf.shares)}</td>
+                      <td style={tdStyle}>{fmtNum(inf.saves)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* PUBLICACIONES */}
+        {activeTab === 'publicaciones' && (
+          <div style={{ background: '#fff', border: '0.5px solid #E5E5E2', borderRadius: 12, overflow: 'hidden' }}>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr>
+                    <th style={thStyle}>Influencer</th>
+                    <th style={thStyle}>Plataforma</th>
+                    <th style={thStyle}>Fecha</th>
+                    <th style={thStyle}>Views</th>
+                    <th style={thStyle}>Likes</th>
+                    <th style={thStyle}>Comentarios</th>
+                    <th style={thStyle}>Shares</th>
+                    <th style={thStyle}>Saves</th>
+                    <th style={thStyle}>ER%</th>
+                    <th style={thStyle}>Link</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {posts.map((p, i) => (
+                    <tr key={p.id}>
+                      <td style={tdStyle}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <Avatar nombre={p.inf_nombre} index={i} size={26} />
+                          <span style={{ fontWeight: 500, fontSize: 13 }}>{p.inf_nombre}</span>
+                        </div>
+                      </td>
+                      <td style={tdStyle}>
+                        <span style={{
+                          fontSize: 11, padding: '2px 7px', borderRadius: 20,
+                          background: p.plataforma === 'TikTok' ? '#F0F0EE' : '#FEF0FB',
+                          color: p.plataforma === 'TikTok' ? '#555' : '#6B1560',
+                        }}>{p.plataforma}</span>
+                      </td>
+                      <td style={{ ...tdStyle, fontSize: 12, color: '#888' }}>
+                        {p.fecha_publicacion ? new Date(p.fecha_publicacion).toLocaleDateString('es-CL') : '—'}
+                      </td>
+                      <td style={{ ...tdStyle, fontWeight: 500 }}>{p.latest ? fmtNum(p.latest.views) : <span style={{ color: '#CCC' }}>—</span>}</td>
+                      <td style={tdStyle}>{p.latest ? fmtNum(p.latest.likes) : <span style={{ color: '#CCC' }}>—</span>}</td>
+                      <td style={tdStyle}>{p.latest ? fmtNum(p.latest.comentarios) : <span style={{ color: '#CCC' }}>—</span>}</td>
+                      <td style={tdStyle}>{p.latest ? fmtNum(p.latest.shares) : <span style={{ color: '#CCC' }}>—</span>}</td>
+                      <td style={tdStyle}>{p.latest ? fmtNum(p.latest.saves) : <span style={{ color: '#CCC' }}>—</span>}</td>
+                      <td style={tdStyle}>
+                        {p.latest ? (
+                          <span style={{
+                            fontSize: 11, padding: '2px 7px', borderRadius: 20,
+                            background: p.latest.engagement_rate >= 3 ? '#EAF3DE' : p.latest.engagement_rate >= 1 ? '#FAEEDA' : '#F1EFE8',
+                            color: p.latest.engagement_rate >= 3 ? '#27500A' : p.latest.engagement_rate >= 1 ? '#633806' : '#5F5E5A',
+                          }}>{p.latest.engagement_rate}%</span>
+                        ) : <span style={{ color: '#CCC', fontSize: 12 }}>—</span>}
+                      </td>
+                      <td style={tdStyle}>
+                        {p.url ? (
+                          <a href={p.url} target="_blank" rel="noopener noreferrer"
+                            style={{ color: '#E8313A', fontSize: 13, textDecoration: 'none', fontWeight: 500 }}
+                            onMouseEnter={e => e.currentTarget.style.textDecoration = 'underline'}
+                            onMouseLeave={e => e.currentTarget.style.textDecoration = 'none'}
+                          >Ver ↗</a>
+                        ) : <span style={{ color: '#CCC' }}>—</span>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        <div style={{ marginTop: 24, textAlign: 'center', fontSize: 11, color: '#CCC' }}>
+          Reporte generado por RUIDO LAB — Influencer MKT
+        </div>
+      </div>
+    </div>
+  )
+}
