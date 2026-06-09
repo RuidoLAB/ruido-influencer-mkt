@@ -127,6 +127,17 @@ const EMPTY = {
   tipos_contenido: [], estado: 'Activo', notas: '',
 }
 
+function getDuplicateMessage(errorMsg) {
+  if (!errorMsg) return null
+  const msg = errorMsg.toLowerCase()
+  if (msg.includes('unique') || msg.includes('duplicate') || msg.includes('already exists') || msg.includes('violates')) {
+    if (msg.includes('tt_usuario')) return 'Ya existe un influencer con ese usuario de TikTok.'
+    if (msg.includes('ig_usuario')) return 'Ya existe un influencer con ese usuario de Instagram.'
+    return 'Ya existe un influencer con ese usuario de TikTok o Instagram.'
+  }
+  return null
+}
+
 export default function Roster() {
   const [influencers, setInfluencers] = useState([])
   const [loading, setLoading] = useState(true)
@@ -140,6 +151,7 @@ export default function Roster() {
   const [editId, setEditId] = useState(null)
   const [saving, setSaving] = useState(false)
   const [deleteId, setDeleteId] = useState(null)
+  const [duplicateError, setDuplicateError] = useState(null)
 
   useEffect(() => { fetchInfluencers() }, [])
 
@@ -159,6 +171,7 @@ export default function Roster() {
   function openNew() {
     setForm(EMPTY)
     setEditId(null)
+    setDuplicateError(null)
     setModalOpen(true)
   }
 
@@ -176,12 +189,14 @@ export default function Roster() {
       notas: inf.notas || '',
     })
     setEditId(inf.id)
+    setDuplicateError(null)
     setModalOpen(true)
   }
 
   async function handleSave() {
     if (!form.nombre.trim()) return
     setSaving(true)
+    setDuplicateError(null)
     try {
       const ig_seg = parseInt(form.ig_seguidores) || 0
       const tt_seg = parseInt(form.tt_seguidores) || 0
@@ -214,8 +229,16 @@ export default function Roster() {
         `
       }
       setModalOpen(false)
+      setDuplicateError(null)
       await fetchInfluencers()
-    } catch (e) { console.error(e) }
+    } catch (e) {
+      const dupMsg = getDuplicateMessage(e.message)
+      if (dupMsg) {
+        setDuplicateError(dupMsg)
+      } else {
+        console.error(e)
+      }
+    }
     setSaving(false)
   }
 
@@ -307,11 +330,8 @@ export default function Roster() {
                   <th className="th" style={{ width: 200 }}>Influencer</th>
                   <th className="th" style={{ width: 160 }}>Instagram</th>
                   <th className="th" style={{ width: 160 }}>TikTok</th>
-                  <th
-                    className="th"
-                    style={{ width: 110, cursor: 'pointer', userSelect: 'none' }}
-                    onClick={() => setSortAsc(s => !s)}
-                  >
+                  <th className="th" style={{ width: 110, cursor: 'pointer', userSelect: 'none' }}
+                    onClick={() => setSortAsc(s => !s)}>
                     Total seg. {sortAsc ? '↑' : '↓'}
                   </th>
                   <th className="th" style={{ width: 200 }}>Categorías</th>
@@ -384,7 +404,7 @@ export default function Roster() {
       </div>
 
       {/* Modal crear/editar */}
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editId ? 'Editar influencer' : 'Nuevo influencer'}>
+      <Modal open={modalOpen} onClose={() => { setModalOpen(false); setDuplicateError(null) }} title={editId ? 'Editar influencer' : 'Nuevo influencer'}>
         <div className="fg">
           <label className="label">Nombre</label>
           <input className="input" value={form.nombre}
@@ -395,7 +415,7 @@ export default function Roster() {
           <div className="fg">
             <label className="label">Usuario Instagram</label>
             <input className="input" value={form.ig_usuario}
-              onChange={e => setForm(f => ({ ...f, ig_usuario: e.target.value }))}
+              onChange={e => { setForm(f => ({ ...f, ig_usuario: e.target.value })); setDuplicateError(null) }}
               placeholder="@usuario" />
           </div>
           <div className="fg">
@@ -415,7 +435,7 @@ export default function Roster() {
           <div className="fg">
             <label className="label">Usuario TikTok</label>
             <input className="input" value={form.tt_usuario}
-              onChange={e => setForm(f => ({ ...f, tt_usuario: e.target.value }))}
+              onChange={e => { setForm(f => ({ ...f, tt_usuario: e.target.value })); setDuplicateError(null) }}
               placeholder="@usuario" />
           </div>
           <div className="fg">
@@ -456,8 +476,21 @@ export default function Roster() {
             placeholder="Solo visible para el equipo..."
             style={{ resize: 'vertical' }} />
         </div>
-        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
-          <button className="btn-ghost" onClick={() => setModalOpen(false)}>Cancelar</button>
+
+        {/* Error duplicado */}
+        {duplicateError && (
+          <div style={{
+            background: '#FCEBEB', border: '0.5px solid #F7C1C1',
+            borderRadius: 8, padding: '10px 12px', marginBottom: 4,
+            fontSize: 13, color: '#791F1F', display: 'flex', alignItems: 'center', gap: 8,
+          }}>
+            <span>⚠</span>
+            <span>{duplicateError} Busca el influencer existente para editarlo.</span>
+          </div>
+        )}
+
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
+          <button className="btn-ghost" onClick={() => { setModalOpen(false); setDuplicateError(null) }}>Cancelar</button>
           <button className="btn-red" onClick={handleSave} disabled={saving}>
             {saving ? 'Guardando...' : 'Guardar'}
           </button>
