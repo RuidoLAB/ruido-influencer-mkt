@@ -158,7 +158,7 @@ function BudgetSummary({ camp }) {
 }
 
 const EMPTY_CAMP = { nombre: '', cliente: '', budget: '', moneda: 'CLP', brief: '', plataforma: 'Ambas' }
-const EMPTY_CI = { costo: '', piezas: '1', estado: 'Contactado', notas: '', video_link_tt: '', video_link_ig: '' }
+const EMPTY_CI_EDIT = { costo: '', piezas: '1', estado: 'Contactado', notas: '', video_link_tt: '', video_link_ig: '' }
 
 export default function Campanas() {
   const [camps, setCamps] = useState([])
@@ -172,17 +172,17 @@ export default function Campanas() {
   const [campForm, setCampForm] = useState(EMPTY_CAMP)
   const [savingCamp, setSavingCamp] = useState(false)
 
+  // Multi-select modal
   const [modalAddInf, setModalAddInf] = useState(false)
   const [infSearch, setInfSearch] = useState('')
   const [infFilterTipo, setInfFilterTipo] = useState('')
   const [infFilterSize, setInfFilterSize] = useState('')
-  const [selInf, setSelInf] = useState(null)
-  const [ciForm, setCiForm] = useState(EMPTY_CI)
+  const [selectedInfIds, setSelectedInfIds] = useState([])
   const [savingCI, setSavingCI] = useState(false)
 
   const [editCIModal, setEditCIModal] = useState(false)
   const [editCI, setEditCI] = useState(null)
-  const [editCIForm, setEditCIForm] = useState(EMPTY_CI)
+  const [editCIForm, setEditCIForm] = useState(EMPTY_CI_EDIT)
 
   const [deleteCampId, setDeleteCampId] = useState(null)
   const [deleteCI, setDeleteCI] = useState(null)
@@ -292,21 +292,32 @@ export default function Campanas() {
     } catch (e) { console.error(e) }
   }
 
-  async function addInfluencer() {
-    if (!selInf) return
+  function openAddInfModal() {
+    setSelectedInfIds([])
+    setInfSearch('')
+    setInfFilterTipo('')
+    setInfFilterSize('')
+    setModalAddInf(true)
+  }
+
+  function toggleInfSelection(id) {
+    setSelectedInfIds(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    )
+  }
+
+  async function addSelectedInfluencers() {
+    if (selectedInfIds.length === 0) return
     setSavingCI(true)
     try {
-      await sql`
-        INSERT INTO campaign_influencers (campaign_id, influencer_id, costo, piezas, estado, notas, video_link_tt, video_link_ig)
-        VALUES (
-          ${currentCamp.id}, ${selInf.id},
-          ${parseInt(ciForm.costo) || 0},
-          ${parseInt(ciForm.piezas) || 1},
-          ${ciForm.estado}, ${ciForm.notas},
-          ${ciForm.video_link_tt}, ${ciForm.video_link_ig}
-        )
-      `
+      for (const infId of selectedInfIds) {
+        await sql`
+          INSERT INTO campaign_influencers (campaign_id, influencer_id, costo, piezas, estado, notas, video_link_tt, video_link_ig)
+          VALUES (${currentCamp.id}, ${infId}, 0, 1, 'Contactado', '', '', '')
+        `
+      }
       setModalAddInf(false)
+      setSelectedInfIds([])
       await fetchCamps()
     } catch (e) { console.error(e) }
     setSavingCI(false)
@@ -353,10 +364,12 @@ export default function Campanas() {
     return c.estado === tab.slice(0, -1)
   })
 
+  // Influencers disponibles para agregar (no están ya en la campaña)
   const availableInfs = roster.filter(inf => {
     if (currentCamp?.influencers.find(i => i.influencer_id === inf.id)) return false
     const q = infSearch.toLowerCase()
-    const matchSearch = !q || inf.nombre.toLowerCase().includes(q) ||
+    const matchSearch = !q ||
+      inf.nombre.toLowerCase().includes(q) ||
       (inf.ig_usuario || '').toLowerCase().includes(q) ||
       (inf.tt_usuario || '').toLowerCase().includes(q)
     const tipos = inf.tipos_contenido || []
@@ -432,7 +445,6 @@ export default function Campanas() {
     return (
       <div style={{ padding: '20px 24px' }}>
 
-        {/* Header */}
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20 }}>
           <div>
             <div style={{ fontSize: 12, color: '#AAA', cursor: 'pointer', marginBottom: 4 }}
@@ -449,16 +461,11 @@ export default function Campanas() {
           <div style={{ display: 'flex', gap: 8 }}>
             <button className="btn-ghost" onClick={() => setChangeEstadoModal(true)}>Cambiar estado</button>
             {!isReadOnly && campTab === 'influencers' && (
-              <button className="btn-red" onClick={() => {
-                setSelInf(null); setCiForm(EMPTY_CI)
-                setInfSearch(''); setInfFilterTipo(''); setInfFilterSize('')
-                setModalAddInf(true)
-              }}>+ Agregar influencer</button>
+              <button className="btn-red" onClick={openAddInfModal}>+ Agregar influencers</button>
             )}
           </div>
         </div>
 
-        {/* Aviso modo lectura */}
         {isReadOnly && (
           <div style={{
             background: currentCamp.estado === 'Cancelada' ? '#FCEBEB' : '#E6F1FB',
@@ -470,10 +477,7 @@ export default function Campanas() {
           </div>
         )}
 
-        {/* Budget */}
         <BudgetSummary camp={currentCamp} />
-
-        {/* Share panel */}
         <SharePanel camp={currentCamp} onUpdate={fetchCamps} />
 
         {/* Tabs internos */}
@@ -586,7 +590,7 @@ export default function Campanas() {
 
         {/* ── MODALES ── */}
 
-        {/* Cambiar estado campaña */}
+        {/* Cambiar estado */}
         <Modal open={changeEstadoModal} onClose={() => setChangeEstadoModal(false)} title="Cambiar estado">
           <p style={{ fontSize: 13, color: '#888', marginBottom: 16 }}>Estado actual: <strong>{currentCamp.estado}</strong></p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
@@ -616,50 +620,71 @@ export default function Campanas() {
           </div>
         </Modal>
 
-        {/* Agregar influencer */}
-        <Modal open={modalAddInf} onClose={() => setModalAddInf(false)} title="Agregar influencer">
-          <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+        {/* ── MODAL AGREGAR INFLUENCERS (multi-select) ── */}
+        <Modal open={modalAddInf} onClose={() => setModalAddInf(false)} title="Agregar influencers">
+          {/* Filtros */}
+          <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
             <input className="input" placeholder="Buscar..." value={infSearch}
-              onChange={e => { setInfSearch(e.target.value); setSelInf(null) }} style={{ flex: 1 }} />
+              onChange={e => setInfSearch(e.target.value)} style={{ flex: 1 }} />
             <select className="input" style={{ width: 120 }} value={infFilterTipo}
-              onChange={e => { setInfFilterTipo(e.target.value); setSelInf(null) }}>
+              onChange={e => setInfFilterTipo(e.target.value)}>
               <option value="">Categoría</option>
               {TIPOS.map(t => <option key={t}>{t}</option>)}
             </select>
             <select className="input" style={{ width: 100 }} value={infFilterSize}
-              onChange={e => { setInfFilterSize(e.target.value); setSelInf(null) }}>
+              onChange={e => setInfFilterSize(e.target.value)}>
               <option value="">Tamaño</option>
               {SIZE_RANGES.map(s => <option key={s.label}>{s.label}</option>)}
             </select>
           </div>
-          <div style={{ border: '0.5px solid #E5E5E2', borderRadius: 8, maxHeight: 220, overflowY: 'auto', marginBottom: 14 }}>
+
+          {/* Lista */}
+          <div style={{ border: '0.5px solid #E5E5E2', borderRadius: 8, maxHeight: 340, overflowY: 'auto', marginBottom: 14 }}>
             {availableInfs.length === 0 ? (
-              <div style={{ padding: 16, textAlign: 'center', color: '#AAA', fontSize: 12 }}>Sin resultados</div>
+              <div style={{ padding: 24, textAlign: 'center', color: '#AAA', fontSize: 13 }}>
+                {infSearch || infFilterTipo || infFilterSize ? 'Sin resultados' : 'Todos los influencers activos ya están en la campaña'}
+              </div>
             ) : availableInfs.map((inf, i) => {
+              const isSelected = selectedInfIds.includes(inf.id)
               const igS = getSize(inf.ig_seguidores)
               const ttS = getSize(inf.tt_seguidores)
               const tipos = inf.tipos_contenido || []
               return (
-                <div key={inf.id} onClick={() => setSelInf(inf)}
+                <div key={inf.id}
+                  onClick={() => toggleInfSelection(inf.id)}
                   style={{
-                    display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px',
+                    display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px',
                     cursor: 'pointer', borderBottom: '0.5px solid #F0F0EE',
-                    background: selInf?.id === inf.id ? '#FCEBEB' : 'transparent',
+                    background: isSelected ? '#FEF9F9' : 'transparent',
+                    transition: 'background .1s',
                   }}
                 >
+                  {/* Checkbox */}
                   <div style={{
-                    width: 16, height: 16, borderRadius: 4, flexShrink: 0,
-                    border: '0.5px solid ' + (selInf?.id === inf.id ? '#E8313A' : '#D0D0CC'),
-                    background: selInf?.id === inf.id ? '#E8313A' : 'transparent',
+                    width: 18, height: 18, borderRadius: 5, flexShrink: 0,
+                    border: `1.5px solid ${isSelected ? '#E8313A' : '#D0D0CC'}`,
+                    background: isSelected ? '#E8313A' : 'transparent',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 10, color: '#fff',
-                  }}>{selInf?.id === inf.id ? '✓' : ''}</div>
-                  <Avatar nombre={inf.nombre} index={i} size={26} />
+                    transition: 'all .12s',
+                  }}>
+                    {isSelected && <span style={{ fontSize: 11, color: '#fff', fontWeight: 700 }}>✓</span>}
+                  </div>
+
+                  <Avatar nombre={inf.nombre} index={i} size={28} />
+
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 500 }}>{inf.nombre}</div>
-                    <div style={{ fontSize: 11, color: '#AAA', display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 2 }}>
-                      {showIG && <span>IG {fmtSeg(inf.ig_seguidores)} <span style={{ background: igS.bg, color: igS.color, padding: '0 5px', borderRadius: 10 }}>{igS.label}</span></span>}
-                      {showTT && <span>TT {fmtSeg(inf.tt_seguidores)} <span style={{ background: ttS.bg, color: ttS.color, padding: '0 5px', borderRadius: 10 }}>{ttS.label}</span></span>}
+                    <div style={{ fontSize: 13, fontWeight: 500, color: '#1A1A1A' }}>{inf.nombre}</div>
+                    <div style={{ fontSize: 11, color: '#AAA', display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 2 }}>
+                      {showIG && inf.ig_seguidores > 0 && (
+                        <span>IG {fmtSeg(inf.ig_seguidores)}
+                          <span style={{ marginLeft: 3, background: igS.bg, color: igS.color, padding: '0 5px', borderRadius: 10 }}>{igS.label}</span>
+                        </span>
+                      )}
+                      {showTT && inf.tt_seguidores > 0 && (
+                        <span>TT {fmtSeg(inf.tt_seguidores)}
+                          <span style={{ marginLeft: 3, background: ttS.bg, color: ttS.color, padding: '0 5px', borderRadius: 10 }}>{ttS.label}</span>
+                        </span>
+                      )}
                       {tipos.slice(0, 2).map(t => {
                         const c = TIPO_COLORS[t] || TIPO_COLORS['Otros']
                         return <span key={t} style={{ background: c.bg, color: c.color, padding: '0 5px', borderRadius: 10 }}>{t}</span>
@@ -670,41 +695,28 @@ export default function Campanas() {
               )
             })}
           </div>
-          {selInf && (
-            <div style={{ borderTop: '0.5px solid #F0F0EE', paddingTop: 14 }}>
-              <div style={{ fontSize: 12, color: '#888', marginBottom: 10 }}>Configurando: <strong>{selInf.nombre}</strong></div>
-              <div className="form-row-2">
-                <div className="fg">
-                  <label className="label">Costo ({currentCamp.moneda})</label>
-                  <input className="input" type="number" value={ciForm.costo}
-                    onChange={e => setCiForm(f => ({ ...f, costo: e.target.value }))} placeholder="0" />
-                </div>
-                <div className="fg">
-                  <label className="label">Piezas</label>
-                  <input className="input" type="number" value={ciForm.piezas}
-                    onChange={e => setCiForm(f => ({ ...f, piezas: e.target.value }))} />
-                </div>
-              </div>
-              <div className="fg">
-                <label className="label">Estado</label>
-                <select className="input" value={ciForm.estado}
-                  onChange={e => setCiForm(f => ({ ...f, estado: e.target.value }))}>
-                  {ESTADOS_INF.map(e => <option key={e}>{e}</option>)}
-                </select>
-              </div>
-              <VideoLinkFields form={ciForm} setForm={setCiForm} />
-              <div className="fg">
-                <label className="label">Notas internas</label>
-                <textarea className="input" rows={2} value={ciForm.notas}
-                  onChange={e => setCiForm(f => ({ ...f, notas: e.target.value }))} style={{ resize: 'vertical' }} />
-              </div>
+
+          {/* Footer con contador y botón */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ fontSize: 13, color: selectedInfIds.length > 0 ? '#1A1A1A' : '#AAA' }}>
+              {selectedInfIds.length > 0
+                ? <><strong>{selectedInfIds.length}</strong> influencer{selectedInfIds.length > 1 ? 's' : ''} seleccionado{selectedInfIds.length > 1 ? 's' : ''}</>
+                : 'Selecciona uno o más influencers'
+              }
             </div>
-          )}
-          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
-            <button className="btn-ghost" onClick={() => setModalAddInf(false)}>Cancelar</button>
-            <button className="btn-red" onClick={addInfluencer} disabled={!selInf || savingCI}>
-              {savingCI ? 'Agregando...' : 'Agregar'}
-            </button>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {selectedInfIds.length > 0 && (
+                <button className="btn-ghost" style={{ fontSize: 12 }}
+                  onClick={() => setSelectedInfIds([])}>
+                  Limpiar
+                </button>
+              )}
+              <button className="btn-ghost" onClick={() => setModalAddInf(false)}>Cancelar</button>
+              <button className="btn-red" onClick={addSelectedInfluencers}
+                disabled={selectedInfIds.length === 0 || savingCI}>
+                {savingCI ? 'Agregando...' : `Agregar${selectedInfIds.length > 0 ? ` (${selectedInfIds.length})` : ''}`}
+              </button>
+            </div>
           </div>
         </Modal>
 
@@ -766,7 +778,7 @@ export default function Campanas() {
         </button>
       </div>
 
-      {/* Tabs lista */}
+      {/* Tabs */}
       <div style={{ display: 'flex', gap: 2, background: '#F0F0EE', borderRadius: 10, padding: 3, marginBottom: 20, width: 'fit-content', border: '0.5px solid #E5E5E2' }}>
         {TABS_LISTA.map(t => {
           const count = t === 'Todas' ? camps.length : camps.filter(c => c.estado === t.slice(0, -1)).length
@@ -786,7 +798,7 @@ export default function Campanas() {
         })}
       </div>
 
-      {/* Grid campañas */}
+      {/* Grid */}
       {filteredCamps.length === 0 ? (
         <div style={{ padding: 60, textAlign: 'center', color: '#AAA', fontSize: 13 }}>
           No hay campañas {tab !== 'Todas' ? tab.toLowerCase() : ''}.
