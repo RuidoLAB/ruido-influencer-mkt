@@ -27,70 +27,49 @@ function fmtSeg(n) {
 function parseCSV(text) {
   const lines = text.trim().split('\n')
   if (lines.length < 2) return []
-
   const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/\s+/g, '_').replace(/[^a-z_]/g, ''))
-
   const rows = []
   for (let i = 1; i < lines.length; i++) {
     const line = lines[i].trim()
     if (!line) continue
-
-    // Parsear respetando comillas dobles para campos con comas
     const values = []
     let current = ''
     let inQuotes = false
     for (let j = 0; j < line.length; j++) {
       const ch = line[j]
-      if (ch === '"') {
-        inQuotes = !inQuotes
-      } else if (ch === ',' && !inQuotes) {
-        values.push(current.trim())
-        current = ''
-      } else {
-        current += ch
-      }
+      if (ch === '"') { inQuotes = !inQuotes }
+      else if (ch === ',' && !inQuotes) { values.push(current.trim()); current = '' }
+      else { current += ch }
     }
     values.push(current.trim())
-
     const row = {}
-    headers.forEach((h, idx) => {
-      row[h] = values[idx] || ''
-    })
+    headers.forEach((h, idx) => { row[h] = values[idx] || '' })
     rows.push(row)
   }
   return rows
 }
 
 function mapRow(row) {
-  // Mapear columnas flexiblemente
   const get = (...keys) => {
     for (const k of keys) {
       if (row[k] !== undefined && row[k] !== '') return row[k]
     }
     return ''
   }
-
   const ttSeg = parseInt(get('seguidores_tiktok', 'tt_seguidores', 'tiktok_followers', 'followers_tiktok')) || 0
   const igSeg = parseInt(get('seguidores_instagram', 'ig_seguidores', 'instagram_followers', 'followers_instagram')) || 0
-
   const ttUser = get('username_tiktok', 'tiktok_username', 'tt_usuario', 'tiktok')
   const igUser = get('username_instagram', 'instagram_username', 'ig_usuario', 'instagram')
-
-  // Nombre: usar TikTok username limpio, o IG username
   const nombreRaw = ttUser || igUser || ''
   const nombre = nombreRaw.replace(/^@/, '')
-
-  // Categorías
   const catRaw = get('categorias', 'categoria', 'categories', 'category', 'tipos_contenido')
   const tipos = catRaw
     ? catRaw.split(',').map(c => {
         const trimmed = c.trim()
-        // Buscar match case-insensitive
         const match = TIPOS_VALIDOS.find(t => t.toLowerCase() === trimmed.toLowerCase())
         return match || 'Otros'
-      }).filter((v, i, arr) => arr.indexOf(v) === i) // deduplicar
+      }).filter((v, i, arr) => arr.indexOf(v) === i)
     : ['Otros']
-
   return {
     nombre: nombre || 'Sin nombre',
     tt_usuario: ttUser,
@@ -104,14 +83,22 @@ function mapRow(row) {
   }
 }
 
+function isDuplicateError(msg) {
+  if (!msg) return false
+  const m = msg.toLowerCase()
+  return m.includes('unique') || m.includes('duplicate') || m.includes('already exists') || m.includes('violates')
+}
+
 export default function ImportarCSV({ onDone }) {
   const [open, setOpen] = useState(false)
-  const [step, setStep] = useState('upload') // upload | preview | importing | done
+  const [step, setStep] = useState('upload')
   const [preview, setPreview] = useState([])
   const [errors, setErrors] = useState([])
   const [importing, setImporting] = useState(false)
   const [progress, setProgress] = useState(0)
   const [imported, setImported] = useState(0)
+  const [skipped, setSkipped] = useState(0)
+  const [skippedNames, setSkippedNames] = useState([])
   const fileRef = useRef()
 
   function handleOpen() {
@@ -120,6 +107,8 @@ export default function ImportarCSV({ onDone }) {
     setErrors([])
     setProgress(0)
     setImported(0)
+    setSkipped(0)
+    setSkippedNames([])
     setOpen(true)
   }
 
@@ -152,6 +141,9 @@ export default function ImportarCSV({ onDone }) {
     setImporting(true)
     setStep('importing')
     let count = 0
+    let skip = 0
+    const skippedList = []
+
     for (const inf of preview) {
       try {
         await sql`
@@ -166,12 +158,21 @@ export default function ImportarCSV({ onDone }) {
           )
         `
         count++
-        setProgress(Math.round((count / preview.length) * 100))
-        setImported(count)
       } catch (e) {
-        console.error('Error importando fila:', inf.nombre, e)
+        if (isDuplicateError(e.message)) {
+          skip++
+          skippedList.push(inf.nombre || inf.tt_usuario || inf.ig_usuario)
+        } else {
+          console.error('Error importando:', inf.nombre, e)
+        }
       }
+      const total = count + skip
+      setProgress(Math.round((total / preview.length) * 100))
+      setImported(count)
+      setSkipped(skip)
     }
+
+    setSkippedNames(skippedList)
     setStep('done')
     setImporting(false)
     onDone?.()
@@ -184,13 +185,11 @@ export default function ImportarCSV({ onDone }) {
 
   return (
     <>
-      <button className="btn-ghost" onClick={handleOpen}>
-        ↑ Importar CSV
-      </button>
+      <button className="btn-ghost" onClick={handleOpen}>↑ Importar CSV</button>
 
       <Modal open={open} onClose={handleClose} title="Importar influencers desde CSV">
 
-        {/* STEP: UPLOAD */}
+        {/* UPLOAD */}
         {step === 'upload' && (
           <div>
             <p style={{ fontSize: 13, color: '#555', marginBottom: 16, lineHeight: 1.6 }}>
@@ -202,13 +201,15 @@ export default function ImportarCSV({ onDone }) {
               categorias
             </div>
             <p style={{ fontSize: 12, color: '#AAA', marginBottom: 16 }}>
-              Las categorías con varias van separadas por coma dentro de comillas: <code style={{ background: '#F0F0EE', padding: '1px 5px', borderRadius: 4 }}>"Música,Lifestyle"</code>
+              Categorías múltiples separadas por coma: <code style={{ background: '#F0F0EE', padding: '1px 5px', borderRadius: 4 }}>"Música,Lifestyle"</code>
+            </p>
+            <p style={{ fontSize: 12, color: '#888', marginBottom: 16, background: '#F7F7F5', padding: '8px 12px', borderRadius: 8 }}>
+              ℹ Los influencers que ya existan en el roster (mismo usuario TikTok o Instagram) se saltarán automáticamente.
             </p>
             <div
               style={{
                 border: '1.5px dashed #D0D0CC', borderRadius: 10, padding: '32px 20px',
-                textAlign: 'center', cursor: 'pointer', transition: 'all .15s',
-                background: '#FAFAF8',
+                textAlign: 'center', cursor: 'pointer', background: '#FAFAF8', transition: 'all .15s',
               }}
               onClick={() => fileRef.current?.click()}
               onMouseEnter={e => { e.currentTarget.style.borderColor = '#E8313A'; e.currentTarget.style.background = '#FEF9F9' }}
@@ -226,11 +227,9 @@ export default function ImportarCSV({ onDone }) {
               </div>
             )}
 
-            <div style={{ marginTop: 16, padding: '10px 0', borderTop: '0.5px solid #F0F0EE' }}>
+            <div style={{ marginTop: 16, paddingTop: 14, borderTop: '0.5px solid #F0F0EE' }}>
               <div style={{ fontSize: 11, color: '#AAA', marginBottom: 6 }}>¿No tienes el CSV listo? Descarga la plantilla:</div>
-              <button
-                className="btn-ghost"
-                style={{ fontSize: 12 }}
+              <button className="btn-ghost" style={{ fontSize: 12 }}
                 onClick={() => {
                   const content = 'username_tiktok,link_tiktok,seguidores_tiktok,username_instagram,link_instagram,seguidores_instagram,categorias\n@ejemplo,https://tiktok.com/@ejemplo,50000,@ejemplo_ig,https://instagram.com/ejemplo,30000,"Música,Lifestyle"'
                   const blob = new Blob([content], { type: 'text/csv' })
@@ -238,15 +237,14 @@ export default function ImportarCSV({ onDone }) {
                   const a = document.createElement('a')
                   a.href = url; a.download = 'plantilla_influencers.csv'; a.click()
                   URL.revokeObjectURL(url)
-                }}
-              >
-                ↓ Descargar plantilla
+                }}>
+                ↓ Descargar plantilla CSV
               </button>
             </div>
           </div>
         )}
 
-        {/* STEP: PREVIEW */}
+        {/* PREVIEW */}
         {step === 'preview' && (
           <div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
@@ -254,7 +252,8 @@ export default function ImportarCSV({ onDone }) {
                 <strong>{preview.length}</strong> influencers listos para importar
                 {errors.length > 0 && <span style={{ color: '#A32D2D', marginLeft: 8 }}>· {errors.length} advertencias</span>}
               </div>
-              <button className="btn-ghost" style={{ fontSize: 12 }} onClick={() => { setStep('upload'); fileRef.current.value = '' }}>
+              <button className="btn-ghost" style={{ fontSize: 12 }}
+                onClick={() => { setStep('upload'); fileRef.current.value = '' }}>
                 Cambiar archivo
               </button>
             </div>
@@ -265,7 +264,11 @@ export default function ImportarCSV({ onDone }) {
               </div>
             )}
 
-            <div style={{ border: '0.5px solid #E5E5E2', borderRadius: 8, overflow: 'hidden', maxHeight: 320, overflowY: 'auto', marginBottom: 16 }}>
+            <div style={{ marginBottom: 12, background: '#F7F7F5', border: '0.5px solid #E5E5E2', borderRadius: 8, padding: '8px 12px', fontSize: 12, color: '#888' }}>
+              ℹ Los que ya existan en el roster se saltarán automáticamente sin generar error.
+            </div>
+
+            <div style={{ border: '0.5px solid #E5E5E2', borderRadius: 8, overflow: 'hidden', maxHeight: 300, overflowY: 'auto', marginBottom: 16 }}>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ background: '#F7F7F5', borderBottom: '0.5px solid #E5E5E2' }}>
@@ -310,11 +313,11 @@ export default function ImportarCSV({ onDone }) {
           </div>
         )}
 
-        {/* STEP: IMPORTING */}
+        {/* IMPORTING */}
         {step === 'importing' && (
           <div style={{ padding: '20px 0', textAlign: 'center' }}>
             <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 16 }}>
-              Importando... {imported} de {preview.length}
+              Importando... {imported + skipped} de {preview.length}
             </div>
             <div style={{ height: 6, background: '#F0F0EE', borderRadius: 3, overflow: 'hidden', marginBottom: 8 }}>
               <div style={{ height: '100%', width: progress + '%', background: '#E8313A', borderRadius: 3, transition: 'width .2s' }} />
@@ -323,20 +326,53 @@ export default function ImportarCSV({ onDone }) {
           </div>
         )}
 
-        {/* STEP: DONE */}
+        {/* DONE */}
         {step === 'done' && (
-          <div style={{ padding: '16px 0', textAlign: 'center' }}>
-            <div style={{ fontSize: 32, marginBottom: 12 }}>✓</div>
-            <div style={{ fontSize: 15, fontWeight: 500, marginBottom: 6 }}>
-              {imported} influencers importados
+          <div style={{ padding: '16px 0' }}>
+            <div style={{ textAlign: 'center', marginBottom: 20 }}>
+              <div style={{ fontSize: 32, marginBottom: 12 }}>✓</div>
+              <div style={{ fontSize: 15, fontWeight: 500, marginBottom: 6 }}>
+                Importación completada
+              </div>
             </div>
-            <div style={{ fontSize: 13, color: '#AAA', marginBottom: 20 }}>
-              Ya están disponibles en el roster.
+
+            <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
+              <div style={{
+                flex: 1, background: '#EAF3DE', border: '0.5px solid #C5E0A0',
+                borderRadius: 10, padding: '12px 14px', textAlign: 'center',
+              }}>
+                <div style={{ fontSize: 24, fontWeight: 500, color: '#27500A' }}>{imported}</div>
+                <div style={{ fontSize: 12, color: '#3B6D11', marginTop: 3 }}>importados</div>
+              </div>
+              {skipped > 0 && (
+                <div style={{
+                  flex: 1, background: '#FAEEDA', border: '0.5px solid #F0D4A0',
+                  borderRadius: 10, padding: '12px 14px', textAlign: 'center',
+                }}>
+                  <div style={{ fontSize: 24, fontWeight: 500, color: '#633806' }}>{skipped}</div>
+                  <div style={{ fontSize: 12, color: '#854F0B', marginTop: 3 }}>ya existían</div>
+                </div>
+              )}
             </div>
-            <button className="btn-red" onClick={handleClose}>Listo</button>
+
+            {skippedNames.length > 0 && (
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: 12, color: '#888', marginBottom: 6 }}>Saltados por duplicado:</div>
+                <div style={{ background: '#F7F7F5', border: '0.5px solid #E5E5E2', borderRadius: 8, padding: '8px 12px', maxHeight: 120, overflowY: 'auto' }}>
+                  {skippedNames.map((name, i) => (
+                    <div key={i} style={{ fontSize: 12, color: '#888', padding: '2px 0', borderBottom: i < skippedNames.length - 1 ? '0.5px solid #F0F0EE' : 'none' }}>
+                      {name}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', justifyContent: 'center' }}>
+              <button className="btn-red" onClick={handleClose}>Listo</button>
+            </div>
           </div>
         )}
-
       </Modal>
     </>
   )
