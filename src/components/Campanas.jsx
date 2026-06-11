@@ -172,7 +172,12 @@ export default function Campanas() {
   const [campForm, setCampForm] = useState(EMPTY_CAMP)
   const [savingCamp, setSavingCamp] = useState(false)
 
-  // Multi-select modal
+  // Editar campaña
+  const [editCampModal, setEditCampModal] = useState(false)
+  const [editCampForm, setEditCampForm] = useState(EMPTY_CAMP)
+  const [savingEditCamp, setSavingEditCamp] = useState(false)
+
+  // Multi-select
   const [modalAddInf, setModalAddInf] = useState(false)
   const [infSearch, setInfSearch] = useState('')
   const [infFilterTipo, setInfFilterTipo] = useState('')
@@ -275,6 +280,38 @@ export default function Campanas() {
     setSavingCamp(false)
   }
 
+  function openEditCamp() {
+    setEditCampForm({
+      nombre: currentCamp.nombre,
+      cliente: currentCamp.cliente,
+      budget: currentCamp.budget,
+      moneda: currentCamp.moneda,
+      brief: currentCamp.brief || '',
+      plataforma: currentCamp.plataforma || 'Ambas',
+    })
+    setEditCampModal(true)
+  }
+
+  async function saveEditCamp() {
+    if (!editCampForm.nombre.trim() || !editCampForm.cliente.trim()) return
+    setSavingEditCamp(true)
+    try {
+      await sql`
+        UPDATE campaigns SET
+          nombre = ${editCampForm.nombre},
+          cliente = ${editCampForm.cliente},
+          budget = ${parseInt(editCampForm.budget) || 0},
+          moneda = ${editCampForm.moneda},
+          plataforma = ${editCampForm.plataforma},
+          brief = ${editCampForm.brief}
+        WHERE id = ${currentCamp.id}
+      `
+      setEditCampModal(false)
+      await fetchCamps()
+    } catch (e) { console.error(e) }
+    setSavingEditCamp(false)
+  }
+
   async function updateEstado(id, estado) {
     try {
       await sql`UPDATE campaigns SET estado = ${estado} WHERE id = ${id}`
@@ -364,7 +401,6 @@ export default function Campanas() {
     return c.estado === tab.slice(0, -1)
   })
 
-  // Influencers disponibles para agregar (no están ya en la campaña)
   const availableInfs = roster.filter(inf => {
     if (currentCamp?.influencers.find(i => i.influencer_id === inf.id)) return false
     const q = infSearch.toLowerCase()
@@ -458,7 +494,8 @@ export default function Campanas() {
             </div>
             <p style={{ fontSize: 12, color: '#888', marginTop: 2 }}>{currentCamp.cliente} · {currentCamp.moneda}</p>
           </div>
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button className="btn-ghost" onClick={openEditCamp}>✎ Editar campaña</button>
             <button className="btn-ghost" onClick={() => setChangeEstadoModal(true)}>Cambiar estado</button>
             {!isReadOnly && campTab === 'influencers' && (
               <button className="btn-red" onClick={openAddInfModal}>+ Agregar influencers</button>
@@ -494,14 +531,13 @@ export default function Campanas() {
           ))}
         </div>
 
-        {/* ── TAB INFLUENCERS ── */}
+        {/* TAB INFLUENCERS */}
         {campTab === 'influencers' && (
           <div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
               <h2 style={{ fontSize: 14, fontWeight: 500 }}>Influencers en campaña</h2>
               <span style={{ fontSize: 12, color: '#AAA' }}>{currentCamp.influencers.length} seleccionados</span>
             </div>
-
             <div className="card" style={{ overflow: 'hidden' }}>
               {currentCamp.influencers.length === 0 ? (
                 <div style={{ padding: 40, textAlign: 'center', color: '#AAA', fontSize: 13 }}>
@@ -583,12 +619,61 @@ export default function Campanas() {
           </div>
         )}
 
-        {/* ── TAB REPORTES ── */}
+        {/* TAB REPORTES */}
         {campTab === 'reportes' && (
           <Reportes camp={currentCamp} roster={roster} />
         )}
 
         {/* ── MODALES ── */}
+
+        {/* Editar campaña */}
+        <Modal open={editCampModal} onClose={() => setEditCampModal(false)} title="Editar campaña">
+          <div className="fg">
+            <label className="label">Nombre de campaña</label>
+            <input className="input" value={editCampForm.nombre}
+              onChange={e => setEditCampForm(f => ({ ...f, nombre: e.target.value }))}
+              placeholder="Nombre de la campaña" />
+          </div>
+          <div className="fg">
+            <label className="label">Cliente</label>
+            <input className="input" value={editCampForm.cliente}
+              onChange={e => setEditCampForm(f => ({ ...f, cliente: e.target.value }))}
+              placeholder="Nombre del cliente" />
+          </div>
+          <div className="form-row-2">
+            <div className="fg">
+              <label className="label">Budget</label>
+              <input className="input" type="number" value={editCampForm.budget}
+                onChange={e => setEditCampForm(f => ({ ...f, budget: e.target.value }))} />
+            </div>
+            <div className="fg">
+              <label className="label">Moneda</label>
+              <select className="input" value={editCampForm.moneda}
+                onChange={e => setEditCampForm(f => ({ ...f, moneda: e.target.value }))}>
+                <option>CLP</option><option>USD</option>
+              </select>
+            </div>
+          </div>
+          <div className="fg">
+            <label className="label">Plataforma</label>
+            <select className="input" value={editCampForm.plataforma}
+              onChange={e => setEditCampForm(f => ({ ...f, plataforma: e.target.value }))}>
+              {PLATAFORMAS.map(p => <option key={p}>{p}</option>)}
+            </select>
+          </div>
+          <div className="fg">
+            <label className="label">Brief / descripción</label>
+            <textarea className="input" rows={3} value={editCampForm.brief}
+              onChange={e => setEditCampForm(f => ({ ...f, brief: e.target.value }))}
+              style={{ resize: 'vertical' }} />
+          </div>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
+            <button className="btn-ghost" onClick={() => setEditCampModal(false)}>Cancelar</button>
+            <button className="btn-red" onClick={saveEditCamp} disabled={savingEditCamp}>
+              {savingEditCamp ? 'Guardando...' : 'Guardar cambios'}
+            </button>
+          </div>
+        </Modal>
 
         {/* Cambiar estado */}
         <Modal open={changeEstadoModal} onClose={() => setChangeEstadoModal(false)} title="Cambiar estado">
@@ -620,9 +705,8 @@ export default function Campanas() {
           </div>
         </Modal>
 
-        {/* ── MODAL AGREGAR INFLUENCERS (multi-select) ── */}
+        {/* Agregar influencers (multi-select) */}
         <Modal open={modalAddInf} onClose={() => setModalAddInf(false)} title="Agregar influencers">
-          {/* Filtros */}
           <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
             <input className="input" placeholder="Buscar..." value={infSearch}
               onChange={e => setInfSearch(e.target.value)} style={{ flex: 1 }} />
@@ -637,8 +721,6 @@ export default function Campanas() {
               {SIZE_RANGES.map(s => <option key={s.label}>{s.label}</option>)}
             </select>
           </div>
-
-          {/* Lista */}
           <div style={{ border: '0.5px solid #E5E5E2', borderRadius: 8, maxHeight: 340, overflowY: 'auto', marginBottom: 14 }}>
             {availableInfs.length === 0 ? (
               <div style={{ padding: 24, textAlign: 'center', color: '#AAA', fontSize: 13 }}>
@@ -650,8 +732,7 @@ export default function Campanas() {
               const ttS = getSize(inf.tt_seguidores)
               const tipos = inf.tipos_contenido || []
               return (
-                <div key={inf.id}
-                  onClick={() => toggleInfSelection(inf.id)}
+                <div key={inf.id} onClick={() => toggleInfSelection(inf.id)}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px',
                     cursor: 'pointer', borderBottom: '0.5px solid #F0F0EE',
@@ -659,7 +740,6 @@ export default function Campanas() {
                     transition: 'background .1s',
                   }}
                 >
-                  {/* Checkbox */}
                   <div style={{
                     width: 18, height: 18, borderRadius: 5, flexShrink: 0,
                     border: `1.5px solid ${isSelected ? '#E8313A' : '#D0D0CC'}`,
@@ -669,21 +749,15 @@ export default function Campanas() {
                   }}>
                     {isSelected && <span style={{ fontSize: 11, color: '#fff', fontWeight: 700 }}>✓</span>}
                   </div>
-
                   <Avatar nombre={inf.nombre} index={i} size={28} />
-
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 500, color: '#1A1A1A' }}>{inf.nombre}</div>
+                    <div style={{ fontSize: 13, fontWeight: 500 }}>{inf.nombre}</div>
                     <div style={{ fontSize: 11, color: '#AAA', display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 2 }}>
                       {showIG && inf.ig_seguidores > 0 && (
-                        <span>IG {fmtSeg(inf.ig_seguidores)}
-                          <span style={{ marginLeft: 3, background: igS.bg, color: igS.color, padding: '0 5px', borderRadius: 10 }}>{igS.label}</span>
-                        </span>
+                        <span>IG {fmtSeg(inf.ig_seguidores)} <span style={{ background: igS.bg, color: igS.color, padding: '0 5px', borderRadius: 10 }}>{igS.label}</span></span>
                       )}
                       {showTT && inf.tt_seguidores > 0 && (
-                        <span>TT {fmtSeg(inf.tt_seguidores)}
-                          <span style={{ marginLeft: 3, background: ttS.bg, color: ttS.color, padding: '0 5px', borderRadius: 10 }}>{ttS.label}</span>
-                        </span>
+                        <span>TT {fmtSeg(inf.tt_seguidores)} <span style={{ background: ttS.bg, color: ttS.color, padding: '0 5px', borderRadius: 10 }}>{ttS.label}</span></span>
                       )}
                       {tipos.slice(0, 2).map(t => {
                         const c = TIPO_COLORS[t] || TIPO_COLORS['Otros']
@@ -695,25 +769,18 @@ export default function Campanas() {
               )
             })}
           </div>
-
-          {/* Footer con contador y botón */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ fontSize: 13, color: selectedInfIds.length > 0 ? '#1A1A1A' : '#AAA' }}>
               {selectedInfIds.length > 0
-                ? <><strong>{selectedInfIds.length}</strong> influencer{selectedInfIds.length > 1 ? 's' : ''} seleccionado{selectedInfIds.length > 1 ? 's' : ''}</>
-                : 'Selecciona uno o más influencers'
-              }
+                ? <><strong>{selectedInfIds.length}</strong> seleccionado{selectedInfIds.length > 1 ? 's' : ''}</>
+                : 'Selecciona uno o más'}
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               {selectedInfIds.length > 0 && (
-                <button className="btn-ghost" style={{ fontSize: 12 }}
-                  onClick={() => setSelectedInfIds([])}>
-                  Limpiar
-                </button>
+                <button className="btn-ghost" style={{ fontSize: 12 }} onClick={() => setSelectedInfIds([])}>Limpiar</button>
               )}
               <button className="btn-ghost" onClick={() => setModalAddInf(false)}>Cancelar</button>
-              <button className="btn-red" onClick={addSelectedInfluencers}
-                disabled={selectedInfIds.length === 0 || savingCI}>
+              <button className="btn-red" onClick={addSelectedInfluencers} disabled={selectedInfIds.length === 0 || savingCI}>
                 {savingCI ? 'Agregando...' : `Agregar${selectedInfIds.length > 0 ? ` (${selectedInfIds.length})` : ''}`}
               </button>
             </div>
@@ -778,7 +845,6 @@ export default function Campanas() {
         </button>
       </div>
 
-      {/* Tabs */}
       <div style={{ display: 'flex', gap: 2, background: '#F0F0EE', borderRadius: 10, padding: 3, marginBottom: 20, width: 'fit-content', border: '0.5px solid #E5E5E2' }}>
         {TABS_LISTA.map(t => {
           const count = t === 'Todas' ? camps.length : camps.filter(c => c.estado === t.slice(0, -1)).length
@@ -798,7 +864,6 @@ export default function Campanas() {
         })}
       </div>
 
-      {/* Grid */}
       {filteredCamps.length === 0 ? (
         <div style={{ padding: 60, textAlign: 'center', color: '#AAA', fontSize: 13 }}>
           No hay campañas {tab !== 'Todas' ? tab.toLowerCase() : ''}.
@@ -849,7 +914,6 @@ export default function Campanas() {
         </div>
       )}
 
-      {/* Modal nueva campaña */}
       <Modal open={modalNewCamp} onClose={() => setModalNewCamp(false)} title="Nueva campaña">
         <div className="fg">
           <label className="label">Nombre de campaña</label>
@@ -897,7 +961,6 @@ export default function Campanas() {
         </div>
       </Modal>
 
-      {/* Modal eliminar campaña */}
       <Modal open={!!deleteCampId} onClose={() => setDeleteCampId(null)} title="Eliminar campaña">
         <p style={{ fontSize: 13, color: '#555', marginBottom: 20 }}>
           ¿Eliminar esta campaña? Se borrarán todos los datos asociados.
