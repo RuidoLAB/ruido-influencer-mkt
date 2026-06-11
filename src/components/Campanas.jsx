@@ -3,7 +3,7 @@ import sql from '../lib/db'
 import Modal from './Modal'
 import SharePanel from './SharePanel'
 import Reportes from './Reportes'
-
+ 
 const TIPOS = ['Bailes', 'Reviewers', 'Humor', 'Lifestyle', 'Música', 'Gaming', 'Moda', 'Fitness', 'Viajes', 'Otros']
 
 const TIPO_COLORS = {
