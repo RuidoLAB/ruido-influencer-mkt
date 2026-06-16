@@ -87,7 +87,8 @@ export default function VistaCliente({ token }) {
           i.ig_usuario, i.ig_seguidores, i.ig_link,
           i.tt_usuario, i.tt_seguidores, i.tt_link,
           i.tipos_contenido, i.avatar_url,
-          ci.video_link_tt, ci.video_link_ig
+          ci.video_link_tt, ci.video_link_ig,
+          ci.boostcode
         FROM campaigns c
         JOIN campaign_influencers ci ON ci.campaign_id = c.id
         JOIN influencers i ON i.id = ci.influencer_id
@@ -137,9 +138,15 @@ export default function VistaCliente({ token }) {
   const totalTT = camp.influencers.reduce((s, i) => s + Number(i.tt_seguidores), 0)
   const totalSeg = (showIG ? totalIG : 0) + (showTT ? totalTT : 0)
 
+  // Columnas opcionales — solo aparecen si al menos uno tiene dato
   const hasVideoTT = showTT && camp.influencers.some(i => i.video_link_tt)
   const hasVideoIG = showIG && camp.influencers.some(i => i.video_link_ig)
-  const hasAnyVideo = hasVideoTT || hasVideoIG
+  const hasBoostcode = camp.influencers.some(i => i.boostcode && i.boostcode.trim() !== '')
+
+  const thStyle = {
+    padding: '11px 16px', textAlign: 'left', fontSize: 10.5,
+    fontWeight: 500, textTransform: 'uppercase', letterSpacing: '.08em', color: '#AAA',
+  }
 
   return (
     <div style={{ minHeight: '100vh', background: '#F7F7F5', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
@@ -190,12 +197,13 @@ export default function VistaCliente({ token }) {
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ background: '#F7F7F5', borderBottom: '0.5px solid #E5E5E2' }}>
-                  <th style={{ padding: '11px 16px', textAlign: 'left', fontSize: 10.5, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '.08em', color: '#AAA', minWidth: 180 }}>Influencer</th>
-                  {showIG && <th style={{ padding: '11px 16px', textAlign: 'left', fontSize: 10.5, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '.08em', color: '#AAA', minWidth: 150 }}>Instagram</th>}
-                  {showTT && <th style={{ padding: '11px 16px', textAlign: 'left', fontSize: 10.5, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '.08em', color: '#AAA', minWidth: 150 }}>TikTok</th>}
-                  <th style={{ padding: '11px 16px', textAlign: 'left', fontSize: 10.5, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '.08em', color: '#AAA', minWidth: 150 }}>Categorías</th>
-                  {hasVideoIG && <th style={{ padding: '11px 16px', textAlign: 'left', fontSize: 10.5, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '.08em', color: '#AAA', minWidth: 80 }}>Post IG</th>}
-                  {hasVideoTT && <th style={{ padding: '11px 16px', textAlign: 'left', fontSize: 10.5, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '.08em', color: '#AAA', minWidth: 80 }}>Video TT</th>}
+                  <th style={{ ...thStyle, minWidth: 180 }}>Influencer</th>
+                  {showIG && <th style={{ ...thStyle, minWidth: 150 }}>Instagram</th>}
+                  {showTT && <th style={{ ...thStyle, minWidth: 150 }}>TikTok</th>}
+                  <th style={{ ...thStyle, minWidth: 150 }}>Categorías</th>
+                  {hasVideoIG && <th style={{ ...thStyle, minWidth: 80 }}>Post IG</th>}
+                  {hasVideoTT && <th style={{ ...thStyle, minWidth: 80 }}>Video TT</th>}
+                  {hasBoostcode && <th style={{ ...thStyle, minWidth: 110 }}>Boostcode</th>}
                 </tr>
               </thead>
               <tbody>
@@ -244,24 +252,39 @@ export default function VistaCliente({ token }) {
                       </td>
                       {hasVideoIG && (
                         <td style={{ padding: '13px 16px', verticalAlign: 'middle' }}>
-                          {inf.video_link_ig ? (
-                            <a href={inf.video_link_ig} target="_blank" rel="noopener noreferrer"
-                              style={{ color: '#C2185B', fontSize: 13, textDecoration: 'none', fontWeight: 500 }}
-                              onMouseEnter={e => e.currentTarget.style.textDecoration = 'underline'}
-                              onMouseLeave={e => e.currentTarget.style.textDecoration = 'none'}
-                            >Ver ↗</a>
-                          ) : <span style={{ color: '#CCC', fontSize: 12 }}>—</span>}
+                          {inf.video_link_ig
+                            ? <a href={inf.video_link_ig} target="_blank" rel="noopener noreferrer"
+                                style={{ color: '#C2185B', fontSize: 13, textDecoration: 'none', fontWeight: 500 }}
+                                onMouseEnter={e => e.currentTarget.style.textDecoration = 'underline'}
+                                onMouseLeave={e => e.currentTarget.style.textDecoration = 'none'}
+                              >Ver ↗</a>
+                            : <span style={{ color: '#CCC', fontSize: 12 }}>—</span>
+                          }
                         </td>
                       )}
                       {hasVideoTT && (
                         <td style={{ padding: '13px 16px', verticalAlign: 'middle' }}>
-                          {inf.video_link_tt ? (
-                            <a href={inf.video_link_tt} target="_blank" rel="noopener noreferrer"
-                              style={{ color: '#1A1A1A', fontSize: 13, textDecoration: 'none', fontWeight: 500 }}
-                              onMouseEnter={e => e.currentTarget.style.textDecoration = 'underline'}
-                              onMouseLeave={e => e.currentTarget.style.textDecoration = 'none'}
-                            >Ver ↗</a>
-                          ) : <span style={{ color: '#CCC', fontSize: 12 }}>—</span>}
+                          {inf.video_link_tt
+                            ? <a href={inf.video_link_tt} target="_blank" rel="noopener noreferrer"
+                                style={{ color: '#1A1A1A', fontSize: 13, textDecoration: 'none', fontWeight: 500 }}
+                                onMouseEnter={e => e.currentTarget.style.textDecoration = 'underline'}
+                                onMouseLeave={e => e.currentTarget.style.textDecoration = 'none'}
+                              >Ver ↗</a>
+                            : <span style={{ color: '#CCC', fontSize: 12 }}>—</span>
+                          }
+                        </td>
+                      )}
+                      {hasBoostcode && (
+                        <td style={{ padding: '13px 16px', verticalAlign: 'middle' }}>
+                          {inf.boostcode && inf.boostcode.trim()
+                            ? <span style={{
+                                fontFamily: 'monospace', fontSize: 13, fontWeight: 600,
+                                background: '#F7F7F5', border: '0.5px solid #E5E5E2',
+                                padding: '3px 10px', borderRadius: 6, color: '#1A1A1A',
+                                letterSpacing: '.05em',
+                              }}>{inf.boostcode}</span>
+                            : <span style={{ color: '#CCC', fontSize: 12 }}>—</span>
+                          }
                         </td>
                       )}
                     </tr>
@@ -271,7 +294,7 @@ export default function VistaCliente({ token }) {
             </table>
           </div>
 
-          {/* Footer totales */}
+          {/* Footer */}
           <div style={{ padding: '14px 16px', background: '#F7F7F5', borderTop: '0.5px solid #E5E5E2', display: 'flex', justifyContent: 'flex-end', gap: 24 }}>
             <div style={{ textAlign: 'right' }}>
               <div style={{ fontSize: 10.5, color: '#AAA', textTransform: 'uppercase', letterSpacing: '.07em' }}>Total influencers</div>
