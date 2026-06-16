@@ -3,7 +3,7 @@ import sql from '../lib/db'
 import Modal from './Modal'
 import SharePanel from './SharePanel'
 import Reportes from './Reportes'
- 
+
 const TIPOS = ['Bailes', 'Reviewers', 'Humor', 'Lifestyle', 'Música', 'Gaming', 'Moda', 'Fitness', 'Viajes', 'Otros']
 
 const TIPO_COLORS = {
@@ -158,7 +158,7 @@ function BudgetSummary({ camp }) {
 }
 
 const EMPTY_CAMP = { nombre: '', cliente: '', budget: '', moneda: 'CLP', brief: '', plataforma: 'Ambas' }
-const EMPTY_CI_EDIT = { costo: '', piezas: '1', estado: 'Contactado', notas: '', video_link_tt: '', video_link_ig: '' }
+const EMPTY_CI_EDIT = { costo: '', piezas: '1', estado: 'Contactado', notas: '', video_link_tt: '', video_link_ig: '', boostcode: '' }
 
 export default function Campanas() {
   const [camps, setCamps] = useState([])
@@ -172,12 +172,10 @@ export default function Campanas() {
   const [campForm, setCampForm] = useState(EMPTY_CAMP)
   const [savingCamp, setSavingCamp] = useState(false)
 
-  // Editar campaña
   const [editCampModal, setEditCampModal] = useState(false)
   const [editCampForm, setEditCampForm] = useState(EMPTY_CAMP)
   const [savingEditCamp, setSavingEditCamp] = useState(false)
 
-  // Multi-select
   const [modalAddInf, setModalAddInf] = useState(false)
   const [infSearch, setInfSearch] = useState('')
   const [infFilterTipo, setInfFilterTipo] = useState('')
@@ -204,6 +202,7 @@ export default function Campanas() {
           ci.id AS ci_id, ci.costo, ci.piezas,
           ci.estado AS ci_estado, ci.notas AS ci_notas,
           ci.video_link_tt, ci.video_link_ig,
+          ci.boostcode,
           ci.influencer_id,
           i.nombre AS inf_nombre,
           i.ig_usuario, i.ig_seguidores,
@@ -233,6 +232,7 @@ export default function Campanas() {
             ci_estado: row.ci_estado, ci_notas: row.ci_notas,
             video_link_tt: row.video_link_tt || '',
             video_link_ig: row.video_link_ig || '',
+            boostcode: row.boostcode || '',
             nombre: row.inf_nombre,
             ig_usuario: row.ig_usuario, ig_seguidores: row.ig_seguidores,
             tt_usuario: row.tt_usuario, tt_seguidores: row.tt_seguidores,
@@ -349,8 +349,8 @@ export default function Campanas() {
     try {
       for (const infId of selectedInfIds) {
         await sql`
-          INSERT INTO campaign_influencers (campaign_id, influencer_id, costo, piezas, estado, notas, video_link_tt, video_link_ig)
-          VALUES (${currentCamp.id}, ${infId}, 0, 1, 'Contactado', '', '', '')
+          INSERT INTO campaign_influencers (campaign_id, influencer_id, costo, piezas, estado, notas, video_link_tt, video_link_ig, boostcode)
+          VALUES (${currentCamp.id}, ${infId}, 0, 1, 'Contactado', '', '', '', '')
         `
       }
       setModalAddInf(false)
@@ -375,6 +375,7 @@ export default function Campanas() {
       estado: inf.ci_estado, notas: inf.ci_notas || '',
       video_link_tt: inf.video_link_tt || '',
       video_link_ig: inf.video_link_ig || '',
+      boostcode: inf.boostcode || '',
     })
     setEditCIModal(true)
   }
@@ -388,7 +389,8 @@ export default function Campanas() {
           estado = ${editCIForm.estado},
           notas = ${editCIForm.notas},
           video_link_tt = ${editCIForm.video_link_tt},
-          video_link_ig = ${editCIForm.video_link_ig}
+          video_link_ig = ${editCIForm.video_link_ig},
+          boostcode = ${editCIForm.boostcode}
         WHERE id = ${editCI.ci_id}
       `
       setEditCIModal(false)
@@ -475,7 +477,6 @@ export default function Campanas() {
 
   if (loading) return <div style={{ padding: 40, color: '#AAA', fontSize: 13 }}>Cargando...</div>
 
-  // ─── VISTA DETALLE ───
   if (currentCamp) {
     const ec = ESTADO_CAMP_COLORS[currentCamp.estado] || ESTADO_CAMP_COLORS['Activa']
     return (
@@ -517,7 +518,6 @@ export default function Campanas() {
         <BudgetSummary camp={currentCamp} />
         <SharePanel camp={currentCamp} onUpdate={fetchCamps} />
 
-        {/* Tabs internos */}
         <div style={{ display: 'flex', gap: 2, background: '#F0F0EE', borderRadius: 10, padding: 3, marginBottom: 20, width: 'fit-content', border: '0.5px solid #E5E5E2' }}>
           {TABS_DETALLE.map(t => (
             <div key={t} onClick={() => setCampTab(t)} style={{
@@ -531,7 +531,6 @@ export default function Campanas() {
           ))}
         </div>
 
-        {/* TAB INFLUENCERS */}
         {campTab === 'influencers' && (
           <div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
@@ -556,6 +555,7 @@ export default function Campanas() {
                         <th className="th" style={{ width: 50 }}>Piezas</th>
                         <th className="th" style={{ width: 120 }}>Estado</th>
                         <th className="th" style={{ width: 90 }}>Videos</th>
+                        <th className="th" style={{ width: 100 }}>Boostcode</th>
                         {!isReadOnly && <th className="th" style={{ width: 70 }}></th>}
                       </tr>
                     </thead>
@@ -600,6 +600,12 @@ export default function Campanas() {
                               <span style={{ background: ec.bg, color: ec.color, padding: '2px 8px', borderRadius: 20, fontSize: 11 }}>{inf.ci_estado}</span>
                             </td>
                             <td className="td"><VideoCell inf={inf} /></td>
+                            <td className="td">
+                              {inf.boostcode
+                                ? <span style={{ fontFamily: 'monospace', fontSize: 12, background: '#F7F7F5', padding: '2px 7px', borderRadius: 6, color: '#555' }}>{inf.boostcode}</span>
+                                : <span style={{ color: '#CCC', fontSize: 12 }}>—</span>
+                              }
+                            </td>
                             {!isReadOnly && (
                               <td className="td">
                                 <div style={{ display: 'flex', gap: 4 }}>
@@ -619,26 +625,21 @@ export default function Campanas() {
           </div>
         )}
 
-        {/* TAB REPORTES */}
         {campTab === 'reportes' && (
           <Reportes camp={currentCamp} roster={roster} />
         )}
 
-        {/* ── MODALES ── */}
-
-        {/* Editar campaña */}
+        {/* Modal editar campaña */}
         <Modal open={editCampModal} onClose={() => setEditCampModal(false)} title="Editar campaña">
           <div className="fg">
             <label className="label">Nombre de campaña</label>
             <input className="input" value={editCampForm.nombre}
-              onChange={e => setEditCampForm(f => ({ ...f, nombre: e.target.value }))}
-              placeholder="Nombre de la campaña" />
+              onChange={e => setEditCampForm(f => ({ ...f, nombre: e.target.value }))} />
           </div>
           <div className="fg">
             <label className="label">Cliente</label>
             <input className="input" value={editCampForm.cliente}
-              onChange={e => setEditCampForm(f => ({ ...f, cliente: e.target.value }))}
-              placeholder="Nombre del cliente" />
+              onChange={e => setEditCampForm(f => ({ ...f, cliente: e.target.value }))} />
           </div>
           <div className="form-row-2">
             <div className="fg">
@@ -664,8 +665,7 @@ export default function Campanas() {
           <div className="fg">
             <label className="label">Brief / descripción</label>
             <textarea className="input" rows={3} value={editCampForm.brief}
-              onChange={e => setEditCampForm(f => ({ ...f, brief: e.target.value }))}
-              style={{ resize: 'vertical' }} />
+              onChange={e => setEditCampForm(f => ({ ...f, brief: e.target.value }))} style={{ resize: 'vertical' }} />
           </div>
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
             <button className="btn-ghost" onClick={() => setEditCampModal(false)}>Cancelar</button>
@@ -675,7 +675,7 @@ export default function Campanas() {
           </div>
         </Modal>
 
-        {/* Cambiar estado */}
+        {/* Modal cambiar estado */}
         <Modal open={changeEstadoModal} onClose={() => setChangeEstadoModal(false)} title="Cambiar estado">
           <p style={{ fontSize: 13, color: '#888', marginBottom: 16 }}>Estado actual: <strong>{currentCamp.estado}</strong></p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
@@ -705,7 +705,7 @@ export default function Campanas() {
           </div>
         </Modal>
 
-        {/* Agregar influencers (multi-select) */}
+        {/* Modal agregar influencers multi-select */}
         <Modal open={modalAddInf} onClose={() => setModalAddInf(false)} title="Agregar influencers">
           <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
             <input className="input" placeholder="Buscar..." value={infSearch}
@@ -787,7 +787,7 @@ export default function Campanas() {
           </div>
         </Modal>
 
-        {/* Editar influencer en campaña */}
+        {/* Modal editar influencer en campaña */}
         <Modal open={editCIModal} onClose={() => setEditCIModal(false)} title={`Editar — ${editCI?.nombre}`}>
           <div className="form-row-2">
             <div className="fg">
@@ -810,6 +810,12 @@ export default function Campanas() {
           </div>
           <VideoLinkFields form={editCIForm} setForm={setEditCIForm} />
           <div className="fg">
+            <label className="label">Boostcode</label>
+            <input className="input" value={editCIForm.boostcode}
+              onChange={e => setEditCIForm(f => ({ ...f, boostcode: e.target.value }))}
+              placeholder="Ej: ABC123" style={{ fontFamily: 'monospace' }} />
+          </div>
+          <div className="fg">
             <label className="label">Notas internas</label>
             <textarea className="input" rows={2} value={editCIForm.notas}
               onChange={e => setEditCIForm(f => ({ ...f, notas: e.target.value }))} style={{ resize: 'vertical' }} />
@@ -820,7 +826,7 @@ export default function Campanas() {
           </div>
         </Modal>
 
-        {/* Quitar influencer */}
+        {/* Modal quitar influencer */}
         <Modal open={!!deleteCI} onClose={() => setDeleteCI(null)} title="Quitar influencer">
           <p style={{ fontSize: 13, color: '#555', marginBottom: 20 }}>¿Quitar este influencer? Los datos se perderán.</p>
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
