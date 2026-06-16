@@ -32,13 +32,6 @@ function fmtNum(n) {
   return n.toLocaleString('es-CL')
 }
 
-function fmtSeg(n) {
-  n = Number(n)
-  if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M'
-  if (n >= 1000) return Math.round(n / 1000) + 'K'
-  return n.toLocaleString('es-CL')
-}
-
 function Avatar({ nombre, index, size = 32 }) {
   const c = AV_COLORS[index % AV_COLORS.length]
   return (
@@ -77,18 +70,29 @@ function MetricPill({ label, value, good }) {
   )
 }
 
+function PlatBadge({ plataforma }) {
+  const isTT = plataforma === 'TikTok'
+  return (
+    <span style={{
+      fontSize: 10.5, padding: '2px 7px', borderRadius: 20,
+      background: isTT ? '#F0F0EE' : '#FEF0FB',
+      color: isTT ? '#555' : '#6B1560',
+    }}>{plataforma}</span>
+  )
+}
+
 export default function VistaReporte({ token }) {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [activeTab, setActiveTab] = useState('resumen')
+  const [platFilter, setPlatFilter] = useState('Todas')
 
   useEffect(() => { if (token) fetchReport(token) }, [token])
 
   async function fetchReport(t) {
     setLoading(true)
     try {
-      // Verificar token
       const tokenData = await sql`
         SELECT rt.*, c.nombre AS camp_nombre, c.cliente, c.plataforma
         FROM report_tokens rt
@@ -105,7 +109,6 @@ export default function VistaReporte({ token }) {
 
       const campInfo = tokenData[0]
 
-      // Traer posts con métricas e influencers
       const postsData = await sql`
         SELECT
           p.*,
@@ -124,7 +127,6 @@ export default function VistaReporte({ token }) {
         ORDER BY p.fecha_publicacion DESC NULLS LAST
       `
 
-      // Agrupar por post
       const grouped = {}
       postsData.forEach(row => {
         if (!grouped[row.id]) {
@@ -155,7 +157,10 @@ export default function VistaReporte({ token }) {
         latest: p.metrics.sort((a, b) => new Date(b.fecha_registro) - new Date(a.fecha_registro))[0] || null,
       }))
 
-      setData({ camp: campInfo, posts })
+      // Detectar plataformas disponibles
+      const plataformas = [...new Set(posts.map(p => p.plataforma))].filter(Boolean)
+
+      setData({ camp: campInfo, posts, plataformas })
     } catch (e) { console.error(e); setError('error') }
     setLoading(false)
   }
@@ -178,8 +183,14 @@ export default function VistaReporte({ token }) {
     </div>
   )
 
-  const { camp, posts } = data
-  const postsConMetricas = posts.filter(p => p.latest)
+  const { camp, posts, plataformas } = data
+
+  // Filtrar posts por plataforma seleccionada
+  const filteredPosts = platFilter === 'Todas'
+    ? posts
+    : posts.filter(p => p.plataforma === platFilter)
+
+  const postsConMetricas = filteredPosts.filter(p => p.latest)
 
   const totals = postsConMetricas.reduce((acc, p) => ({
     views: acc.views + p.latest.views,
@@ -193,9 +204,9 @@ export default function VistaReporte({ token }) {
     ? (postsConMetricas.reduce((s, p) => s + p.latest.engagement_rate, 0) / postsConMetricas.length).toFixed(2)
     : 0
 
-  // Por influencer
+  // Por influencer (de posts filtrados)
   const byInf = {}
-  posts.forEach((p, idx) => {
+  filteredPosts.forEach(p => {
     if (!byInf[p.influencer_id]) {
       byInf[p.influencer_id] = {
         nombre: p.inf_nombre, posts: 0, views: 0, likes: 0,
@@ -223,6 +234,10 @@ export default function VistaReporte({ token }) {
   }
   const tdStyle = { padding: '12px 16px', fontSize: 13, verticalAlign: 'middle', borderBottom: '0.5px solid #F0F0EE' }
 
+  // Tabs de plataforma — solo mostrar si hay más de una
+  const showPlatTabs = plataformas.length > 1
+  const platTabs = ['Todas', ...plataformas]
+
   return (
     <div style={{ minHeight: '100vh', background: '#F7F7F5', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
 
@@ -232,11 +247,46 @@ export default function VistaReporte({ token }) {
           <div style={{ width: 28, height: 28, background: '#E8313A', borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#fff' }}>R</div>
           <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', letterSpacing: '.05em' }}>RUIDO LAB — Reporte de campaña</span>
         </div>
-        <h1 style={{ fontSize: 22, fontWeight: 500, color: '#fff', marginBottom: 4 }}>{camp.camp_nombre}</h1>
-        <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', marginBottom: 24 }}>{camp.cliente}</p>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16, marginBottom: 24 }}>
+          <div>
+            <h1 style={{ fontSize: 22, fontWeight: 500, color: '#fff', marginBottom: 4 }}>{camp.camp_nombre}</h1>
+            <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)' }}>{camp.cliente}</p>
+          </div>
+          {/* Selector de plataforma en el header */}
+          {showPlatTabs && (
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+              {platTabs.map(p => {
+                const isActive = platFilter === p
+                const isTT = p === 'TikTok'
+                const isIG = p === 'Instagram'
+                return (
+                  <button
+                    key={p}
+                    onClick={() => setPlatFilter(p)}
+                    style={{
+                      padding: '6px 14px', borderRadius: 20, fontSize: 12.5, cursor: 'pointer',
+                      border: isActive ? 'none' : '0.5px solid rgba(255,255,255,0.2)',
+                      background: isActive
+                        ? isTT ? '#F0F0EE' : isIG ? '#FEF0FB' : '#E8313A'
+                        : 'transparent',
+                      color: isActive
+                        ? isTT ? '#555' : isIG ? '#6B1560' : '#fff'
+                        : 'rgba(255,255,255,0.6)',
+                      fontFamily: 'inherit',
+                      transition: 'all .15s',
+                    }}
+                  >
+                    {p}
+                  </button>
+                )
+              })}
+            </div>
+          )}
+        </div>
 
+        {/* KPIs */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10 }}>
-          <StatCard label="Publicaciones" value={posts.length} sub={`${infList.length} influencers`} />
+          <StatCard label="Publicaciones" value={filteredPosts.length} sub={`${infList.length} influencers`} />
           <StatCard label="Views totales" value={fmtNum(totals.views)} />
           <StatCard label="Likes totales" value={fmtNum(totals.likes)} />
           <StatCard label="Comentarios" value={fmtNum(totals.comentarios)} />
@@ -246,7 +296,7 @@ export default function VistaReporte({ token }) {
 
       <div style={{ padding: '24px 40px' }}>
 
-        {/* Tabs */}
+        {/* Tabs de contenido */}
         <div style={{ display: 'flex', gap: 2, background: '#EBEBEB', borderRadius: 10, padding: 3, marginBottom: 24, width: 'fit-content', border: '0.5px solid #E0E0E0' }}>
           {['resumen', 'por influencer', 'publicaciones'].map(t => (
             <div key={t} onClick={() => setActiveTab(t)} style={{
@@ -260,8 +310,15 @@ export default function VistaReporte({ token }) {
           ))}
         </div>
 
+        {/* Aviso si no hay posts con métricas */}
+        {filteredPosts.length === 0 && (
+          <div style={{ padding: '40px 0', textAlign: 'center', color: '#AAA', fontSize: 13 }}>
+            No hay publicaciones para {platFilter === 'Todas' ? 'esta campaña' : platFilter} aún.
+          </div>
+        )}
+
         {/* RESUMEN */}
-        {activeTab === 'resumen' && (
+        {activeTab === 'resumen' && filteredPosts.length > 0 && (
           <div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 20 }}>
               <MetricPill label="Shares" value={fmtNum(totals.shares)} />
@@ -271,7 +328,10 @@ export default function VistaReporte({ token }) {
 
             {postsConMetricas.length > 0 && (
               <div>
-                <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 12 }}>Top posts por views</div>
+                <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 12 }}>
+                  Top posts por views
+                  {platFilter !== 'Todas' && <span style={{ fontSize: 12, fontWeight: 400, color: '#AAA', marginLeft: 8 }}>— {platFilter}</span>}
+                </div>
                 <div style={{ background: '#fff', border: '0.5px solid #E5E5E2', borderRadius: 12, overflow: 'hidden' }}>
                   {postsConMetricas
                     .sort((a, b) => b.latest.views - a.latest.views)
@@ -295,11 +355,7 @@ export default function VistaReporte({ token }) {
                                   background: p.latest.engagement_rate >= 3 ? '#EAF3DE' : p.latest.engagement_rate >= 1 ? '#FAEEDA' : '#F1EFE8',
                                   color: p.latest.engagement_rate >= 3 ? '#27500A' : p.latest.engagement_rate >= 1 ? '#633806' : '#5F5E5A',
                                 }}>{p.latest.engagement_rate}% ER</span>
-                                <span style={{
-                                  fontSize: 10.5, padding: '2px 7px', borderRadius: 20,
-                                  background: p.plataforma === 'TikTok' ? '#F0F0EE' : '#FEF0FB',
-                                  color: p.plataforma === 'TikTok' ? '#555' : '#6B1560',
-                                }}>{p.plataforma}</span>
+                                <PlatBadge plataforma={p.plataforma} />
                               </div>
                             </div>
                             <div style={{ height: 4, background: '#F0F0EE', borderRadius: 2, overflow: 'hidden' }}>
@@ -322,7 +378,7 @@ export default function VistaReporte({ token }) {
         )}
 
         {/* POR INFLUENCER */}
-        {activeTab === 'por influencer' && (
+        {activeTab === 'por influencer' && filteredPosts.length > 0 && (
           <div style={{ background: '#fff', border: '0.5px solid #E5E5E2', borderRadius: 12, overflow: 'hidden' }}>
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -370,7 +426,7 @@ export default function VistaReporte({ token }) {
         )}
 
         {/* PUBLICACIONES */}
-        {activeTab === 'publicaciones' && (
+        {activeTab === 'publicaciones' && filteredPosts.length > 0 && (
           <div style={{ background: '#fff', border: '0.5px solid #E5E5E2', borderRadius: 12, overflow: 'hidden' }}>
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -389,7 +445,7 @@ export default function VistaReporte({ token }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {posts.map((p, i) => (
+                  {filteredPosts.map((p, i) => (
                     <tr key={p.id}>
                       <td style={tdStyle}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -397,13 +453,7 @@ export default function VistaReporte({ token }) {
                           <span style={{ fontWeight: 500, fontSize: 13 }}>{p.inf_nombre}</span>
                         </div>
                       </td>
-                      <td style={tdStyle}>
-                        <span style={{
-                          fontSize: 11, padding: '2px 7px', borderRadius: 20,
-                          background: p.plataforma === 'TikTok' ? '#F0F0EE' : '#FEF0FB',
-                          color: p.plataforma === 'TikTok' ? '#555' : '#6B1560',
-                        }}>{p.plataforma}</span>
-                      </td>
+                      <td style={tdStyle}><PlatBadge plataforma={p.plataforma} /></td>
                       <td style={{ ...tdStyle, fontSize: 12, color: '#888' }}>
                         {p.fecha_publicacion ? new Date(p.fecha_publicacion).toLocaleDateString('es-CL') : '—'}
                       </td>
