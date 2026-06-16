@@ -382,6 +382,9 @@ export default function Campanas() {
 
   async function saveEditCI() {
     try {
+      const ttAnterior = editCI.video_link_tt
+      const igAnterior = editCI.video_link_ig
+
       await sql`
         UPDATE campaign_influencers SET
           costo = ${parseInt(editCIForm.costo) || 0},
@@ -393,6 +396,51 @@ export default function Campanas() {
           boostcode = ${editCIForm.boostcode}
         WHERE id = ${editCI.ci_id}
       `
+
+      // Auto-sync: si se agrega link TikTok nuevo → crear/actualizar post en reportes
+      if (editCIForm.video_link_tt && editCIForm.video_link_tt !== ttAnterior) {
+        const existing = await sql`
+          SELECT id FROM posts
+          WHERE campaign_id = ${currentCamp.id}
+            AND influencer_id = ${editCI.influencer_id}
+            AND plataforma = 'TikTok'
+          LIMIT 1
+        `
+        if (existing.length === 0) {
+          await sql`
+            INSERT INTO posts (campaign_id, influencer_id, plataforma, url)
+            VALUES (${currentCamp.id}, ${editCI.influencer_id}, 'TikTok', ${editCIForm.video_link_tt})
+          `
+        } else {
+          await sql`
+            UPDATE posts SET url = ${editCIForm.video_link_tt}
+            WHERE id = ${existing[0].id}
+          `
+        }
+      }
+
+      // Auto-sync: si se agrega link Instagram nuevo → crear/actualizar post en reportes
+      if (editCIForm.video_link_ig && editCIForm.video_link_ig !== igAnterior) {
+        const existing = await sql`
+          SELECT id FROM posts
+          WHERE campaign_id = ${currentCamp.id}
+            AND influencer_id = ${editCI.influencer_id}
+            AND plataforma = 'Instagram'
+          LIMIT 1
+        `
+        if (existing.length === 0) {
+          await sql`
+            INSERT INTO posts (campaign_id, influencer_id, plataforma, url)
+            VALUES (${currentCamp.id}, ${editCI.influencer_id}, 'Instagram', ${editCIForm.video_link_ig})
+          `
+        } else {
+          await sql`
+            UPDATE posts SET url = ${editCIForm.video_link_ig}
+            WHERE id = ${existing[0].id}
+          `
+        }
+      }
+
       setEditCIModal(false)
       await fetchCamps()
     } catch (e) { console.error(e) }
@@ -477,6 +525,7 @@ export default function Campanas() {
 
   if (loading) return <div style={{ padding: 40, color: '#AAA', fontSize: 13 }}>Cargando...</div>
 
+  // ─── VISTA DETALLE ───
   if (currentCamp) {
     const ec = ESTADO_CAMP_COLORS[currentCamp.estado] || ESTADO_CAMP_COLORS['Activa']
     return (
@@ -531,6 +580,7 @@ export default function Campanas() {
           ))}
         </div>
 
+        {/* TAB INFLUENCERS */}
         {campTab === 'influencers' && (
           <div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
@@ -625,6 +675,7 @@ export default function Campanas() {
           </div>
         )}
 
+        {/* TAB REPORTES */}
         {campTab === 'reportes' && (
           <Reportes camp={currentCamp} roster={roster} />
         )}
@@ -787,7 +838,7 @@ export default function Campanas() {
           </div>
         </Modal>
 
-        {/* Modal editar influencer en campaña */}
+        {/* Modal editar influencer */}
         <Modal open={editCIModal} onClose={() => setEditCIModal(false)} title={`Editar — ${editCI?.nombre}`}>
           <div className="form-row-2">
             <div className="fg">
@@ -920,6 +971,7 @@ export default function Campanas() {
         </div>
       )}
 
+      {/* Modal nueva campaña */}
       <Modal open={modalNewCamp} onClose={() => setModalNewCamp(false)} title="Nueva campaña">
         <div className="fg">
           <label className="label">Nombre de campaña</label>
@@ -967,6 +1019,7 @@ export default function Campanas() {
         </div>
       </Modal>
 
+      {/* Modal eliminar campaña */}
       <Modal open={!!deleteCampId} onClose={() => setDeleteCampId(null)} title="Eliminar campaña">
         <p style={{ fontSize: 13, color: '#555', marginBottom: 20 }}>
           ¿Eliminar esta campaña? Se borrarán todos los datos asociados.
