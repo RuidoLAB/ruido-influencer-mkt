@@ -240,7 +240,13 @@ export default function Campanas() {
           })
         }
       })
-      const list = Object.values(grouped)
+      const list = Object.values(grouped).map(camp => ({
+  ...camp,
+  influencers: camp.influencers.sort((a, b) =>
+    (Number(b.ig_seguidores) + Number(b.tt_seguidores)) -
+    (Number(a.ig_seguidores) + Number(a.tt_seguidores))
+  )
+}))
       setCamps(list)
       if (currentCamp) {
         const updated = list.find(c => c.id === currentCamp.id)
