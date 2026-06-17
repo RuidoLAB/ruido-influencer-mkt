@@ -102,7 +102,10 @@ export default function VistaCliente({ token }) {
           nombre: rows[0].camp_nombre,
           cliente: rows[0].cliente,
           plataforma: rows[0].plataforma || 'Ambas',
-          influencers: rows,
+         influencers: rows.sort((a, b) =>
+  (Number(b.ig_seguidores) + Number(b.tt_seguidores)) -
+  (Number(a.ig_seguidores) + Number(a.tt_seguidores))
+),
         })
       }
     } catch (e) { console.error(e); setError('error') }
