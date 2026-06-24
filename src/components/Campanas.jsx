@@ -3,6 +3,7 @@ import sql from '../lib/db'
 import Modal from './Modal'
 import SharePanel from './SharePanel'
 import Reportes from './Reportes'
+import Pagos from './Pagos'
 
 const TIPOS = ['Bailes', 'Reviewers', 'Humor', 'Lifestyle', 'Música', 'Gaming', 'Moda', 'Fitness', 'Viajes', 'Otros']
 
@@ -62,7 +63,7 @@ const AV_COLORS = [
 ]
 
 const TABS_LISTA = ['Activas', 'Pausadas', 'Cerradas', 'Canceladas', 'Todas']
-const TABS_DETALLE = ['influencers', 'reportes']
+const TABS_DETALLE = ['influencers', 'pagos', 'reportes']
 const PLATAFORMAS = ['Ambas', 'TikTok', 'Instagram']
 
 function fmtSeg(n) {
@@ -203,6 +204,7 @@ export default function Campanas() {
           ci.estado AS ci_estado, ci.notas AS ci_notas,
           ci.video_link_tt, ci.video_link_ig,
           ci.boostcode,
+          ci.estado_pago, ci.link_boleta,
           ci.influencer_id,
           i.nombre AS inf_nombre,
           i.ig_usuario, i.ig_seguidores,
@@ -233,6 +235,8 @@ export default function Campanas() {
             video_link_tt: row.video_link_tt || '',
             video_link_ig: row.video_link_ig || '',
             boostcode: row.boostcode || '',
+            estado_pago: row.estado_pago || 'Pendiente',
+            link_boleta: row.link_boleta || '',
             nombre: row.inf_nombre,
             ig_usuario: row.ig_usuario, ig_seguidores: row.ig_seguidores,
             tt_usuario: row.tt_usuario, tt_seguidores: row.tt_seguidores,
@@ -241,12 +245,12 @@ export default function Campanas() {
         }
       })
       const list = Object.values(grouped).map(camp => ({
-  ...camp,
-  influencers: camp.influencers.sort((a, b) =>
-    (Number(b.ig_seguidores) + Number(b.tt_seguidores)) -
-    (Number(a.ig_seguidores) + Number(a.tt_seguidores))
-  )
-}))
+        ...camp,
+        influencers: camp.influencers.sort((a, b) =>
+          (Number(b.ig_seguidores) + Number(b.tt_seguidores)) -
+          (Number(a.ig_seguidores) + Number(a.tt_seguidores))
+        )
+      }))
       setCamps(list)
       if (currentCamp) {
         const updated = list.find(c => c.id === currentCamp.id)
@@ -355,8 +359,8 @@ export default function Campanas() {
     try {
       for (const infId of selectedInfIds) {
         await sql`
-          INSERT INTO campaign_influencers (campaign_id, influencer_id, costo, piezas, estado, notas, video_link_tt, video_link_ig, boostcode)
-          VALUES (${currentCamp.id}, ${infId}, 0, 1, 'Contactado', '', '', '', '')
+          INSERT INTO campaign_influencers (campaign_id, influencer_id, costo, piezas, estado, notas, video_link_tt, video_link_ig, boostcode, estado_pago, link_boleta)
+          VALUES (${currentCamp.id}, ${infId}, 0, 1, 'Contactado', '', '', '', '', 'Pendiente', '')
         `
       }
       setModalAddInf(false)
@@ -403,7 +407,6 @@ export default function Campanas() {
         WHERE id = ${editCI.ci_id}
       `
 
-      // Auto-sync: si se agrega link TikTok nuevo → crear/actualizar post en reportes
       if (editCIForm.video_link_tt && editCIForm.video_link_tt !== ttAnterior) {
         const existing = await sql`
           SELECT id FROM posts
@@ -418,14 +421,10 @@ export default function Campanas() {
             VALUES (${currentCamp.id}, ${editCI.influencer_id}, 'TikTok', ${editCIForm.video_link_tt})
           `
         } else {
-          await sql`
-            UPDATE posts SET url = ${editCIForm.video_link_tt}
-            WHERE id = ${existing[0].id}
-          `
+          await sql`UPDATE posts SET url = ${editCIForm.video_link_tt} WHERE id = ${existing[0].id}`
         }
       }
 
-      // Auto-sync: si se agrega link Instagram nuevo → crear/actualizar post en reportes
       if (editCIForm.video_link_ig && editCIForm.video_link_ig !== igAnterior) {
         const existing = await sql`
           SELECT id FROM posts
@@ -440,10 +439,7 @@ export default function Campanas() {
             VALUES (${currentCamp.id}, ${editCI.influencer_id}, 'Instagram', ${editCIForm.video_link_ig})
           `
         } else {
-          await sql`
-            UPDATE posts SET url = ${editCIForm.video_link_ig}
-            WHERE id = ${existing[0].id}
-          `
+          await sql`UPDATE posts SET url = ${editCIForm.video_link_ig} WHERE id = ${existing[0].id}`
         }
       }
 
@@ -573,6 +569,7 @@ export default function Campanas() {
         <BudgetSummary camp={currentCamp} />
         <SharePanel camp={currentCamp} onUpdate={fetchCamps} />
 
+        {/* Tabs internos */}
         <div style={{ display: 'flex', gap: 2, background: '#F0F0EE', borderRadius: 10, padding: 3, marginBottom: 20, width: 'fit-content', border: '0.5px solid #E5E5E2' }}>
           {TABS_DETALLE.map(t => (
             <div key={t} onClick={() => setCampTab(t)} style={{
@@ -590,39 +587,35 @@ export default function Campanas() {
         {campTab === 'influencers' && (
           <div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-  <h2 style={{ fontSize: 14, fontWeight: 500 }}>Influencers en campaña</h2>
-  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-    <span style={{ fontSize: 12, color: '#AAA' }}>{currentCamp.influencers.length} seleccionados</span>
-    {showTT && (
-      <button className="btn-ghost" style={{ fontSize: 12 }}
-        onClick={() => {
-          const links = currentCamp.influencers
-            .map(i => i.video_link_tt)
-            .filter(l => l && l.trim() !== '')
-          if (links.length === 0) return alert('No hay links de TikTok cargados')
-          navigator.clipboard.writeText(links.join('\n'))
-            .then(() => alert(`${links.length} links de TikTok copiados`))
-            .catch(() => prompt('Copia estos links:', links.join('\n')))
-        }}>
-        Copiar links TT
-      </button>
-    )}
-    {showIG && (
-      <button className="btn-ghost" style={{ fontSize: 12 }}
-        onClick={() => {
-          const links = currentCamp.influencers
-            .map(i => i.video_link_ig)
-            .filter(l => l && l.trim() !== '')
-          if (links.length === 0) return alert('No hay links de Instagram cargados')
-          navigator.clipboard.writeText(links.join('\n'))
-            .then(() => alert(`${links.length} links de Instagram copiados`))
-            .catch(() => prompt('Copia estos links:', links.join('\n')))
-        }}>
-        Copiar links IG
-      </button>
-    )}
-  </div>
-</div>
+              <h2 style={{ fontSize: 14, fontWeight: 500 }}>Influencers en campaña</h2>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <span style={{ fontSize: 12, color: '#AAA' }}>{currentCamp.influencers.length} seleccionados</span>
+                {showTT && (
+                  <button className="btn-ghost" style={{ fontSize: 12 }}
+                    onClick={() => {
+                      const links = currentCamp.influencers.map(i => i.video_link_tt).filter(l => l && l.trim() !== '')
+                      if (links.length === 0) return alert('No hay links de TikTok cargados')
+                      navigator.clipboard.writeText(links.join('\n'))
+                        .then(() => alert(`${links.length} links de TikTok copiados`))
+                        .catch(() => prompt('Copia estos links:', links.join('\n')))
+                    }}>
+                    Copiar links TT
+                  </button>
+                )}
+                {showIG && (
+                  <button className="btn-ghost" style={{ fontSize: 12 }}
+                    onClick={() => {
+                      const links = currentCamp.influencers.map(i => i.video_link_ig).filter(l => l && l.trim() !== '')
+                      if (links.length === 0) return alert('No hay links de Instagram cargados')
+                      navigator.clipboard.writeText(links.join('\n'))
+                        .then(() => alert(`${links.length} links de Instagram copiados`))
+                        .catch(() => prompt('Copia estos links:', links.join('\n')))
+                    }}>
+                    Copiar links IG
+                  </button>
+                )}
+              </div>
+            </div>
             <div className="card" style={{ overflow: 'hidden' }}>
               {currentCamp.influencers.length === 0 ? (
                 <div style={{ padding: 40, textAlign: 'center', color: '#AAA', fontSize: 13 }}>
@@ -711,6 +704,11 @@ export default function Campanas() {
           </div>
         )}
 
+        {/* TAB PAGOS */}
+        {campTab === 'pagos' && (
+          <Pagos camp={currentCamp} onUpdate={fetchCamps} />
+        )}
+
         {/* TAB REPORTES */}
         {campTab === 'reportes' && (
           <Reportes camp={currentCamp} roster={roster} />
@@ -792,7 +790,7 @@ export default function Campanas() {
           </div>
         </Modal>
 
-        {/* Modal agregar influencers multi-select */}
+        {/* Modal agregar influencers */}
         <Modal open={modalAddInf} onClose={() => setModalAddInf(false)} title="Agregar influencers">
           <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
             <input className="input" placeholder="Buscar..." value={infSearch}
@@ -1007,7 +1005,6 @@ export default function Campanas() {
         </div>
       )}
 
-      {/* Modal nueva campaña */}
       <Modal open={modalNewCamp} onClose={() => setModalNewCamp(false)} title="Nueva campaña">
         <div className="fg">
           <label className="label">Nombre de campaña</label>
@@ -1055,7 +1052,6 @@ export default function Campanas() {
         </div>
       </Modal>
 
-      {/* Modal eliminar campaña */}
       <Modal open={!!deleteCampId} onClose={() => setDeleteCampId(null)} title="Eliminar campaña">
         <p style={{ fontSize: 13, color: '#555', marginBottom: 20 }}>
           ¿Eliminar esta campaña? Se borrarán todos los datos asociados.
