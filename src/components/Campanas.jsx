@@ -590,9 +590,39 @@ export default function Campanas() {
         {campTab === 'influencers' && (
           <div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-              <h2 style={{ fontSize: 14, fontWeight: 500 }}>Influencers en campaña</h2>
-              <span style={{ fontSize: 12, color: '#AAA' }}>{currentCamp.influencers.length} seleccionados</span>
-            </div>
+  <h2 style={{ fontSize: 14, fontWeight: 500 }}>Influencers en campaña</h2>
+  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+    <span style={{ fontSize: 12, color: '#AAA' }}>{currentCamp.influencers.length} seleccionados</span>
+    {showTT && (
+      <button className="btn-ghost" style={{ fontSize: 12 }}
+        onClick={() => {
+          const links = currentCamp.influencers
+            .map(i => i.video_link_tt)
+            .filter(l => l && l.trim() !== '')
+          if (links.length === 0) return alert('No hay links de TikTok cargados')
+          navigator.clipboard.writeText(links.join('\n'))
+            .then(() => alert(`${links.length} links de TikTok copiados`))
+            .catch(() => prompt('Copia estos links:', links.join('\n')))
+        }}>
+        Copiar links TT
+      </button>
+    )}
+    {showIG && (
+      <button className="btn-ghost" style={{ fontSize: 12 }}
+        onClick={() => {
+          const links = currentCamp.influencers
+            .map(i => i.video_link_ig)
+            .filter(l => l && l.trim() !== '')
+          if (links.length === 0) return alert('No hay links de Instagram cargados')
+          navigator.clipboard.writeText(links.join('\n'))
+            .then(() => alert(`${links.length} links de Instagram copiados`))
+            .catch(() => prompt('Copia estos links:', links.join('\n')))
+        }}>
+        Copiar links IG
+      </button>
+    )}
+  </div>
+</div>
             <div className="card" style={{ overflow: 'hidden' }}>
               {currentCamp.influencers.length === 0 ? (
                 <div style={{ padding: 40, textAlign: 'center', color: '#AAA', fontSize: 13 }}>
