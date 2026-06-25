@@ -2,6 +2,10 @@ export default function Sidebar({ page, setPage, onLogout }) {
   const items = [
     { id: 'dashboard', label: 'Dashboard', icon: '◈' },
     { id: 'roster', label: 'Roster', icon: '◉' },
+  ]
+
+  const clientItems = [
+    { id: 'clientes', label: 'Clientes', icon: '◍' },
     { id: 'campanas', label: 'Campañas', icon: '◎' },
   ]
 
@@ -25,18 +29,38 @@ export default function Sidebar({ page, setPage, onLogout }) {
 
       {/* Nav */}
       <nav style={{ padding: '8px 0', flex: 1 }}>
+        <div style={{ padding: '10px 16px 4px', fontSize: 10, letterSpacing: '.1em', textTransform: 'uppercase', color: '#CCC' }}>
+          Principal
+        </div>
         {items.map(item => (
-          <div
-            key={item.id}
-            onClick={() => setPage(item.id)}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 8,
-              padding: '8px 12px', margin: '1px 6px', borderRadius: 8,
-              cursor: 'pointer', fontSize: 13,
-              background: page === item.id ? '#FCEBEB' : 'transparent',
-              color: page === item.id ? '#A32D2D' : '#666',
-              transition: 'all .12s',
-            }}
+          <div key={item.id} onClick={() => setPage(item.id)} style={{
+            display: 'flex', alignItems: 'center', gap: 8,
+            padding: '8px 12px', margin: '1px 6px', borderRadius: 8,
+            cursor: 'pointer', fontSize: 13,
+            background: page === item.id ? '#FCEBEB' : 'transparent',
+            color: page === item.id ? '#A32D2D' : '#666',
+            transition: 'all .12s',
+          }}
+            onMouseEnter={e => { if (page !== item.id) e.currentTarget.style.background = '#F7F7F5' }}
+            onMouseLeave={e => { if (page !== item.id) e.currentTarget.style.background = 'transparent' }}
+          >
+            <span style={{ fontSize: 15, width: 16, textAlign: 'center' }}>{item.icon}</span>
+            {item.label}
+          </div>
+        ))}
+
+        <div style={{ padding: '14px 16px 4px', fontSize: 10, letterSpacing: '.1em', textTransform: 'uppercase', color: '#CCC' }}>
+          Clientes
+        </div>
+        {clientItems.map(item => (
+          <div key={item.id} onClick={() => setPage(item.id)} style={{
+            display: 'flex', alignItems: 'center', gap: 8,
+            padding: '8px 12px', margin: '1px 6px', borderRadius: 8,
+            cursor: 'pointer', fontSize: 13,
+            background: page === item.id ? '#FCEBEB' : 'transparent',
+            color: page === item.id ? '#A32D2D' : '#666',
+            transition: 'all .12s',
+          }}
             onMouseEnter={e => { if (page !== item.id) e.currentTarget.style.background = '#F7F7F5' }}
             onMouseLeave={e => { if (page !== item.id) e.currentTarget.style.background = 'transparent' }}
           >
@@ -48,14 +72,11 @@ export default function Sidebar({ page, setPage, onLogout }) {
 
       {/* Logout */}
       <div style={{ padding: '12px 8px', borderTop: '0.5px solid #E5E5E2' }}>
-        <div
-          onClick={onLogout}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 8,
-            padding: '8px 12px', borderRadius: 8,
-            cursor: 'pointer', fontSize: 13, color: '#AAA',
-            transition: 'all .12s',
-          }}
+        <div onClick={onLogout} style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          padding: '8px 12px', borderRadius: 8,
+          cursor: 'pointer', fontSize: 13, color: '#AAA', transition: 'all .12s',
+        }}
           onMouseEnter={e => { e.currentTarget.style.background = '#FCEBEB'; e.currentTarget.style.color = '#A32D2D' }}
           onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#AAA' }}
         >
