@@ -79,6 +79,16 @@ function fmtMoney(n, moneda) {
   return '$' + n.toLocaleString('es-CL')
 }
 
+function isValidUrl(url) {
+  if (!url || !url.trim()) return true // opcional
+  try {
+    const u = new URL(url)
+    return u.protocol === 'https:' || u.protocol === 'http:'
+  } catch {
+    return false
+  }
+}
+
 function Avatar({ nombre, index, size = 30 }) {
   const c = AV_COLORS[index % AV_COLORS.length]
   return (
@@ -161,7 +171,7 @@ function BudgetSummary({ camp }) {
 const EMPTY_CAMP = {
   nombre: '', cliente: '', client_id: '', budget: '', moneda: 'CLP',
   brief: '', plataforma: 'Ambas', artista: '', cancion: '',
-  fecha_inicio: '', fecha_termino: '',
+  fecha_inicio: '', fecha_termino: '', reporte_url: '',
 }
 const EMPTY_CI_EDIT = { costo: '', piezas: '1', estado: 'Contactado', notas: '', video_link_tt: '', video_link_ig: '', boostcode: '' }
 
@@ -176,10 +186,12 @@ export default function Campanas({ initialCamp = null }) {
 
   const [modalNewCamp, setModalNewCamp] = useState(false)
   const [campForm, setCampForm] = useState(EMPTY_CAMP)
+  const [campFormError, setCampFormError] = useState('')
   const [savingCamp, setSavingCamp] = useState(false)
 
   const [editCampModal, setEditCampModal] = useState(false)
   const [editCampForm, setEditCampForm] = useState(EMPTY_CAMP)
+  const [editCampFormError, setEditCampFormError] = useState('')
   const [savingEditCamp, setSavingEditCamp] = useState(false)
 
   const [modalAddInf, setModalAddInf] = useState(false)
@@ -234,6 +246,7 @@ export default function Campanas({ initialCamp = null }) {
             plataforma: row.plataforma || 'Ambas',
             artista: row.artista || '', cancion: row.cancion || '',
             fecha_inicio: row.fecha_inicio || '', fecha_termino: row.fecha_termino || '',
+            reporte_url: row.reporte_url || '',
             influencers: [],
           }
         }
@@ -283,10 +296,15 @@ export default function Campanas({ initialCamp = null }) {
 
   async function saveCamp() {
     if (!campForm.nombre.trim()) return
+    if (campForm.reporte_url && !isValidUrl(campForm.reporte_url)) {
+      setCampFormError('El link del reporte no es una URL válida.')
+      return
+    }
+    setCampFormError('')
     setSavingCamp(true)
     try {
       await sql`
-        INSERT INTO campaigns (nombre, cliente, client_id, budget, moneda, brief, plataforma, share_token, artista, cancion, fecha_inicio, fecha_termino)
+        INSERT INTO campaigns (nombre, cliente, client_id, budget, moneda, brief, plataforma, share_token, artista, cancion, fecha_inicio, fecha_termino, reporte_url)
         VALUES (
           ${campForm.nombre},
           ${campForm.client_id ? (clientsList.find(c => c.id === campForm.client_id)?.nombre || '') : campForm.cliente},
@@ -295,7 +313,8 @@ export default function Campanas({ initialCamp = null }) {
           ${campForm.moneda}, ${campForm.brief},
           ${campForm.plataforma}, ${crypto.randomUUID()},
           ${campForm.artista}, ${campForm.cancion},
-          ${campForm.fecha_inicio || null}, ${campForm.fecha_termino || null}
+          ${campForm.fecha_inicio || null}, ${campForm.fecha_termino || null},
+          ${campForm.reporte_url || ''}
         )
       `
       setModalNewCamp(false)
@@ -318,12 +337,19 @@ export default function Campanas({ initialCamp = null }) {
       cancion: currentCamp.cancion || '',
       fecha_inicio: currentCamp.fecha_inicio || '',
       fecha_termino: currentCamp.fecha_termino || '',
+      reporte_url: currentCamp.reporte_url || '',
     })
+    setEditCampFormError('')
     setEditCampModal(true)
   }
 
   async function saveEditCamp() {
     if (!editCampForm.nombre.trim()) return
+    if (editCampForm.reporte_url && !isValidUrl(editCampForm.reporte_url)) {
+      setEditCampFormError('El link del reporte no es una URL válida.')
+      return
+    }
+    setEditCampFormError('')
     setSavingEditCamp(true)
     try {
       await sql`
@@ -338,7 +364,8 @@ export default function Campanas({ initialCamp = null }) {
           artista = ${editCampForm.artista},
           cancion = ${editCampForm.cancion},
           fecha_inicio = ${editCampForm.fecha_inicio || null},
-          fecha_termino = ${editCampForm.fecha_termino || null}
+          fecha_termino = ${editCampForm.fecha_termino || null},
+          reporte_url = ${editCampForm.reporte_url || ''}
         WHERE id = ${currentCamp.id}
       `
       setEditCampModal(false)
@@ -527,8 +554,7 @@ export default function Campanas({ initialCamp = null }) {
     )
   }
 
-  // Campos comunes para modal de campaña
-  function CampFormFields({ form, setForm }) {
+  function CampFormFields({ form, setForm, error }) {
     return (
       <>
         <div className="fg">
@@ -597,6 +623,24 @@ export default function Campanas({ initialCamp = null }) {
           <textarea className="input" rows={3} value={form.brief}
             onChange={e => setForm(f => ({ ...f, brief: e.target.value }))} style={{ resize: 'vertical' }} />
         </div>
+        <div className="fg">
+          <label className="label">Reporte de métricas — URL (opcional)</label>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input className="input" value={form.reporte_url}
+              onChange={e => setForm(f => ({ ...f, reporte_url: e.target.value }))}
+              placeholder="https://..." style={{ flex: 1 }} />
+            {form.reporte_url && isValidUrl(form.reporte_url) && (
+              <a href={form.reporte_url} target="_blank" rel="noopener noreferrer"
+                style={{ display: 'flex', alignItems: 'center', padding: '0 12px', background: '#F7F7F5', border: '0.5px solid #E5E5E2', borderRadius: 8, fontSize: 12, color: '#555', textDecoration: 'none', whiteSpace: 'nowrap', flexShrink: 0 }}
+                onMouseEnter={e => e.currentTarget.style.background = '#EFEFED'}
+                onMouseLeave={e => e.currentTarget.style.background = '#F7F7F5'}
+              >Abrir ↗</a>
+            )}
+          </div>
+          {error && (
+            <div style={{ fontSize: 12, color: '#A32D2D', marginTop: 5 }}>⚠ {error}</div>
+          )}
+        </div>
       </>
     )
   }
@@ -620,7 +664,7 @@ export default function Campanas({ initialCamp = null }) {
               <span style={{ fontSize: 11, padding: '2px 9px', borderRadius: 20, background: ec.bg, color: ec.color }}>{currentCamp.estado}</span>
               <span style={{ fontSize: 11, padding: '2px 9px', borderRadius: 20, background: '#F0F0EE', color: '#666' }}>{plat}</span>
             </div>
-            <div style={{ display: 'flex', align: 'center', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
               {currentCamp.client_nombre && (
                 <span style={{ fontSize: 12, color: clientColor, fontWeight: 500 }}>{currentCamp.client_nombre}</span>
               )}
@@ -629,7 +673,21 @@ export default function Campanas({ initialCamp = null }) {
               )}
             </div>
           </div>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+            {currentCamp.reporte_url && (
+              <a href={currentCamp.reporte_url} target="_blank" rel="noopener noreferrer"
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  padding: '7px 14px', borderRadius: 8, fontSize: 12.5,
+                  background: '#1A1A1A', color: '#fff', textDecoration: 'none',
+                  border: '0.5px solid #1A1A1A', transition: 'all .15s',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = '#333' }}
+                onMouseLeave={e => { e.currentTarget.style.background = '#1A1A1A' }}
+              >
+                <span style={{ fontSize: 14 }}>◈</span> Ver reporte métricas
+              </a>
+            )}
             <button className="btn-ghost" onClick={openEditCamp}>✎ Editar</button>
             <button className="btn-ghost" onClick={() => setChangeEstadoModal(true)}>Cambiar estado</button>
             {!isReadOnly && campTab === 'influencers' && (
@@ -776,7 +834,7 @@ export default function Campanas({ initialCamp = null }) {
 
         {/* Modal editar campaña */}
         <Modal open={editCampModal} onClose={() => setEditCampModal(false)} title="Editar campaña">
-          <CampFormFields form={editCampForm} setForm={setEditCampForm} />
+          <CampFormFields form={editCampForm} setForm={setEditCampForm} error={editCampFormError} />
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
             <button className="btn-ghost" onClick={() => setEditCampModal(false)}>Cancelar</button>
             <button className="btn-red" onClick={saveEditCamp} disabled={savingEditCamp}>
@@ -919,7 +977,7 @@ export default function Campanas({ initialCamp = null }) {
           <h1 style={{ fontSize: 20, fontWeight: 500 }}>Campañas</h1>
           <p style={{ fontSize: 12, color: '#888', marginTop: 2 }}>{camps.length} campañas en total</p>
         </div>
-        <button className="btn-red" onClick={() => { setCampForm(EMPTY_CAMP); setModalNewCamp(true) }}>+ Nueva campaña</button>
+        <button className="btn-red" onClick={() => { setCampForm(EMPTY_CAMP); setCampFormError(''); setModalNewCamp(true) }}>+ Nueva campaña</button>
       </div>
 
       <div style={{ display: 'flex', gap: 2, background: '#F0F0EE', borderRadius: 10, padding: 3, marginBottom: 20, width: 'fit-content', border: '0.5px solid #E5E5E2' }}>
@@ -971,9 +1029,8 @@ export default function Campanas({ initialCamp = null }) {
         </div>
       )}
 
-      {/* Modal nueva campaña */}
       <Modal open={modalNewCamp} onClose={() => setModalNewCamp(false)} title="Nueva campaña">
-        <CampFormFields form={campForm} setForm={setCampForm} />
+        <CampFormFields form={campForm} setForm={setCampForm} error={campFormError} />
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
           <button className="btn-ghost" onClick={() => setModalNewCamp(false)}>Cancelar</button>
           <button className="btn-red" onClick={saveCamp} disabled={savingCamp}>{savingCamp ? 'Creando...' : 'Crear campaña'}</button>
