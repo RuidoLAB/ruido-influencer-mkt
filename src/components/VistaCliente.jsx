@@ -72,53 +72,29 @@ function ProfileLink({ username, link }) {
 
 function ReporteCard({ url, plataforma }) {
   const isTT = plataforma === 'TikTok'
-  const platLabel = isTT ? 'TikTok' : 'Instagram'
   const platBg = isTT ? '#F0F0EE' : '#FEF0FB'
   const platColor = isTT ? '#555' : '#6B1560'
-
   return (
     <div style={{
-      background: '#111', borderRadius: 14,
-      padding: '22px 28px',
-      display: 'flex', alignItems: 'center',
-      justifyContent: 'space-between',
+      background: '#111', borderRadius: 14, padding: '22px 28px',
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       gap: 20, flexWrap: 'wrap',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-        <div style={{
-          width: 44, height: 44, borderRadius: 12,
-          background: 'rgba(255,255,255,0.08)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 20, flexShrink: 0,
-        }}>◈</div>
+        <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>◈</div>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
             <span style={{ fontSize: 15, fontWeight: 500, color: '#fff' }}>Reporte de métricas</span>
-            <span style={{ fontSize: 10.5, padding: '1px 7px', borderRadius: 20, background: platBg, color: platColor }}>
-              {platLabel}
-            </span>
+            <span style={{ fontSize: 10.5, padding: '1px 7px', borderRadius: 20, background: platBg, color: platColor }}>{plataforma}</span>
           </div>
-          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)' }}>
-            Revisa el reporte completo de resultados de esta campaña.
-          </div>
+          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)' }}>Revisa el reporte completo de resultados de esta campaña.</div>
         </div>
       </div>
-      <a
-        href={url}
-        target="_blank"
-        rel="noopener noreferrer"
-        style={{
-          display: 'flex', alignItems: 'center', gap: 8,
-          padding: '10px 22px', borderRadius: 10,
-          background: '#E8313A', color: '#fff',
-          textDecoration: 'none', fontSize: 13.5, fontWeight: 500,
-          flexShrink: 0, transition: 'background .15s',
-        }}
+      <a href={url} target="_blank" rel="noopener noreferrer"
+        style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 22px', borderRadius: 10, background: '#E8313A', color: '#fff', textDecoration: 'none', fontSize: 13.5, fontWeight: 500, flexShrink: 0, transition: 'background .15s' }}
         onMouseEnter={e => e.currentTarget.style.background = '#c9242c'}
         onMouseLeave={e => e.currentTarget.style.background = '#E8313A'}
-      >
-        Ver reporte métricas ↗
-      </a>
+      >Ver reporte métricas ↗</a>
     </div>
   )
 }
@@ -214,19 +190,65 @@ export default function VistaCliente({ token }) {
     <div style={{ minHeight: '100vh', background: '#F7F7F5', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
 
       {/* Header */}
-      <div style={{ background: '#111', padding: '28px 40px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-            <div style={{ width: 28, height: 28, background: '#E8313A', borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#fff' }}>R</div>
-            <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', letterSpacing: '.05em' }}>RUIDO LAB — Influencer MKT</span>
-          </div>
-          <h1 style={{ fontSize: 22, fontWeight: 500, color: '#fff', marginBottom: 4 }}>{camp.nombre}</h1>
-          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)' }}>
-            Propuesta para {camp.cliente}
-            {plat !== 'Ambas' && <span style={{ marginLeft: 8, background: 'rgba(255,255,255,0.1)', padding: '1px 8px', borderRadius: 20, fontSize: 11 }}>{plat}</span>}
-          </p>
+      <div style={{ background: '#111', padding: '28px 40px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+          <div style={{ width: 28, height: 28, background: '#E8313A', borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#fff' }}>R</div>
+          <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', letterSpacing: '.05em' }}>RUIDO LAB — Influencer MKT</span>
         </div>
-        <div style={{ display: 'flex', gap: 20, textAlign: 'right', flexWrap: 'wrap' }}>
+
+        {/* Título + botones reporte minimalistas */}
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, marginBottom: 16 }}>
+          <div>
+            <h1 style={{ fontSize: 22, fontWeight: 500, color: '#fff', marginBottom: 4 }}>{camp.nombre}</h1>
+            <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)' }}>
+              Propuesta para {camp.cliente}
+              {plat !== 'Ambas' && <span style={{ marginLeft: 8, background: 'rgba(255,255,255,0.1)', padding: '1px 8px', borderRadius: 20, fontSize: 11 }}>{plat}</span>}
+            </p>
+          </div>
+
+          {/* Botones cuadrados minimalistas */}
+          {hasAnyReporte && (
+            <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+              {hasReporteTT && (
+                <a href={camp.reporte_url_tt} target="_blank" rel="noopener noreferrer"
+                  title="Reporte métricas TikTok"
+                  style={{
+                    width: 36, height: 36, borderRadius: 8,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    background: 'rgba(255,255,255,0.08)', border: '0.5px solid rgba(255,255,255,0.15)',
+                    color: '#fff', textDecoration: 'none', transition: 'all .15s',
+                    flexDirection: 'column', gap: 1, flexShrink: 0,
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.18)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.35)' }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.15)' }}
+                >
+                  <span style={{ fontSize: 14 }}>◈</span>
+                  <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', letterSpacing: '.04em' }}>TT</span>
+                </a>
+              )}
+              {hasReporteIG && (
+                <a href={camp.reporte_url_ig} target="_blank" rel="noopener noreferrer"
+                  title="Reporte métricas Instagram"
+                  style={{
+                    width: 36, height: 36, borderRadius: 8,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    background: 'rgba(255,255,255,0.08)', border: '0.5px solid rgba(255,255,255,0.15)',
+                    color: '#fff', textDecoration: 'none', transition: 'all .15s',
+                    flexDirection: 'column', gap: 1, flexShrink: 0,
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.18)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.35)' }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.15)' }}
+                >
+                  <span style={{ fontSize: 14 }}>◈</span>
+                  <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', letterSpacing: '.04em' }}>IG</span>
+                </a>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Stats */}
+        <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
           <div>
             <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 4 }}>Influencers</div>
             <div style={{ fontSize: 20, fontWeight: 500, color: '#fff' }}>{camp.influencers.length}</div>
@@ -253,7 +275,6 @@ export default function VistaCliente({ token }) {
       </div>
 
       <div style={{ padding: '28px 40px' }}>
-
         {/* Tabla influencers */}
         <div style={{ background: '#fff', border: '0.5px solid #E5E5E2', borderRadius: 12, overflow: 'hidden' }}>
           <div style={{ overflowX: 'auto' }}>
@@ -379,7 +400,7 @@ export default function VistaCliente({ token }) {
           </div>
         </div>
 
-        {/* Tarjetas de reporte — solo si existen */}
+        {/* Tarjetas reporte al fondo */}
         {hasAnyReporte && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 20 }}>
             {hasReporteTT && <ReporteCard url={camp.reporte_url_tt} plataforma="TikTok" />}
