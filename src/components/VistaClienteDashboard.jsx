@@ -77,32 +77,28 @@ function ProfileLink({ username, link }) {
   return <span style={{ fontSize: 13, color: '#555', fontWeight: 500 }}>{username}</span>
 }
 
-function ReporteCard({ url, plataforma }) {
+// Botón cuadrado de reporte con label descriptivo
+function ReporteBtn({ url, plataforma }) {
   const isTT = plataforma === 'TikTok'
-  const platBg = isTT ? '#F0F0EE' : '#FEF0FB'
-  const platColor = isTT ? '#555' : '#6B1560'
   return (
-    <div style={{
-      background: '#111', borderRadius: 14, padding: '22px 28px',
-      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      gap: 20, flexWrap: 'wrap',
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-        <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>◈</div>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-            <span style={{ fontSize: 15, fontWeight: 500, color: '#fff' }}>Reporte de métricas</span>
-            <span style={{ fontSize: 10.5, padding: '1px 7px', borderRadius: 20, background: platBg, color: platColor }}>{plataforma}</span>
-          </div>
-          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)' }}>Revisa el reporte completo de resultados de esta campaña.</div>
-        </div>
-      </div>
-      <a href={url} target="_blank" rel="noopener noreferrer"
-        style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 22px', borderRadius: 10, background: '#E8313A', color: '#fff', textDecoration: 'none', fontSize: 13.5, fontWeight: 500, flexShrink: 0, transition: 'background .15s' }}
-        onMouseEnter={e => e.currentTarget.style.background = '#c9242c'}
-        onMouseLeave={e => e.currentTarget.style.background = '#E8313A'}
-      >Ver reporte métricas ↗</a>
-    </div>
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      style={{
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        gap: 2, padding: '6px 10px', borderRadius: 8, minWidth: 70,
+        background: 'rgba(255,255,255,0.08)', border: '0.5px solid rgba(255,255,255,0.15)',
+        color: '#fff', textDecoration: 'none', transition: 'all .15s', flexShrink: 0,
+      }}
+      onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.18)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.35)' }}
+      onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.15)' }}
+    >
+      <span style={{ fontSize: 14 }}>◈</span>
+      <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.7)', letterSpacing: '.03em', textAlign: 'center', lineHeight: 1.3 }}>
+        Métricas {isTT ? 'TT' : 'IG'}
+      </span>
+    </a>
   )
 }
 
@@ -140,7 +136,6 @@ export default function VistaClienteDashboard({ token }) {
         SELECT
           c.id, c.nombre, c.artista, c.cancion, c.estado,
           c.fecha_inicio, c.fecha_termino, c.plataforma,
-          c.share_token, c.share_active,
           c.reporte_url_tt, c.reporte_url_ig,
           COUNT(DISTINCT ci.id) AS total_influencers,
           COUNT(DISTINCT CASE WHEN ci.video_link_tt != '' OR ci.video_link_ig != '' THEN ci.id END) AS videos_publicados
@@ -202,6 +197,8 @@ export default function VistaClienteDashboard({ token }) {
     const totalIG = selectedCamp.influencers.reduce((s, i) => s + Number(i.ig_seguidores), 0)
     const totalTT = selectedCamp.influencers.reduce((s, i) => s + Number(i.tt_seguidores), 0)
     const totalSeg = (showIG ? totalIG : 0) + (showTT ? totalTT : 0)
+
+    // Columnas opcionales
     const hasVideoTT = showTT && selectedCamp.influencers.some(i => i.video_link_tt)
     const hasVideoIG = showIG && selectedCamp.influencers.some(i => i.video_link_ig)
     const hasBoostcode = selectedCamp.influencers.some(i => i.boostcode && i.boostcode.trim())
@@ -241,36 +238,8 @@ export default function VistaClienteDashboard({ token }) {
             </div>
             {hasAnyReporte && (
               <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-                {hasReporteTT && (
-                  <a href={selectedCamp.reporte_url_tt} target="_blank" rel="noopener noreferrer" title="Reporte métricas TikTok"
-                    style={{
-                      width: 34, height: 34, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      background: 'rgba(255,255,255,0.08)', border: '0.5px solid rgba(255,255,255,0.15)',
-                      color: '#fff', textDecoration: 'none', fontSize: 13, transition: 'all .15s', flexShrink: 0,
-                      flexDirection: 'column', gap: 1,
-                    }}
-                    onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.16)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.3)' }}
-                    onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.15)' }}
-                  >
-                    <span style={{ fontSize: 13 }}>◈</span>
-                    <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', letterSpacing: '.04em' }}>TT</span>
-                  </a>
-                )}
-                {hasReporteIG && (
-                  <a href={selectedCamp.reporte_url_ig} target="_blank" rel="noopener noreferrer" title="Reporte métricas Instagram"
-                    style={{
-                      width: 34, height: 34, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      background: 'rgba(255,255,255,0.08)', border: '0.5px solid rgba(255,255,255,0.15)',
-                      color: '#fff', textDecoration: 'none', fontSize: 13, transition: 'all .15s', flexShrink: 0,
-                      flexDirection: 'column', gap: 1,
-                    }}
-                    onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.16)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.3)' }}
-                    onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.15)' }}
-                  >
-                    <span style={{ fontSize: 13 }}>◈</span>
-                    <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', letterSpacing: '.04em' }}>IG</span>
-                  </a>
-                )}
+                {hasReporteTT && <ReporteBtn url={selectedCamp.reporte_url_tt} plataforma="TikTok" />}
+                {hasReporteIG && <ReporteBtn url={selectedCamp.reporte_url_ig} plataforma="Instagram" />}
               </div>
             )}
           </div>
@@ -307,8 +276,8 @@ export default function VistaClienteDashboard({ token }) {
                     {showIG && <th style={{ ...thStyle, minWidth: 150 }}>Instagram</th>}
                     {showTT && <th style={{ ...thStyle, minWidth: 150 }}>TikTok</th>}
                     <th style={{ ...thStyle, minWidth: 140 }}>Categorías</th>
-                    {hasVideoIG && <th style={{ ...thStyle, minWidth: 80 }}>Post IG</th>}
-                    {hasVideoTT && <th style={{ ...thStyle, minWidth: 80 }}>Video TT</th>}
+                    {hasVideoIG && <th style={{ ...thStyle, minWidth: 90 }}>Post IG</th>}
+                    {hasVideoTT && <th style={{ ...thStyle, minWidth: 90 }}>Video TT</th>}
                     {hasBoostcode && <th style={{ ...thStyle, minWidth: 110 }}>Boostcode</th>}
                   </tr>
                 </thead>
@@ -413,15 +382,7 @@ export default function VistaClienteDashboard({ token }) {
             </div>
           </div>
 
-          {/* Tarjetas reporte */}
-          {hasAnyReporte && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 20 }}>
-              {hasReporteTT && <ReporteCard url={selectedCamp.reporte_url_tt} plataforma="TikTok" />}
-              {hasReporteIG && <ReporteCard url={selectedCamp.reporte_url_ig} plataforma="Instagram" />}
-            </div>
-          )}
-
-          <div style={{ marginTop: 20, textAlign: 'center', fontSize: 11, color: '#CCC' }}>
+          <div style={{ marginTop: 24, textAlign: 'center', fontSize: 11, color: '#CCC' }}>
             Portal generado por RUIDO LAB — Influencer MKT
           </div>
         </div>
@@ -538,7 +499,8 @@ export default function VistaClienteDashboard({ token }) {
                       {!camp.artista && !camp.cancion && <span>Sin artista asignado</span>}
                     </div>
                   </div>
-                  <div style={{ display: 'flex', gap: 24, flexShrink: 0, alignItems: 'center' }}>
+
+                  <div style={{ display: 'flex', gap: 20, flexShrink: 0, alignItems: 'center' }}>
                     <div style={{ textAlign: 'center' }}>
                       <div style={{ fontSize: 16, fontWeight: 500 }}>{camp.total_influencers}</div>
                       <div style={{ fontSize: 10, color: '#AAA', textTransform: 'uppercase', letterSpacing: '.06em' }}>Influs</div>
@@ -553,44 +515,48 @@ export default function VistaClienteDashboard({ token }) {
                       </div>
                       <div style={{ fontSize: 10, color: '#AAA', textTransform: 'uppercase', letterSpacing: '.06em' }}>Inicio</div>
                     </div>
-                    {/* Botones reporte minimalistas */}
+
+                    {/* Botones reporte en la lista */}
                     {(hasTT || hasIG) && (
                       <div style={{ display: 'flex', gap: 6 }}>
                         {hasTT && (
                           <a href={camp.reporte_url_tt} target="_blank" rel="noopener noreferrer"
                             onClick={e => e.stopPropagation()}
-                            title="Reporte métricas TikTok"
+                            title="Métricas TikTok"
                             style={{
-                              width: 32, height: 32, borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                              background: '#F7F7F5', border: '0.5px solid #E5E5E2', color: '#555',
-                              textDecoration: 'none', fontSize: 12, transition: 'all .15s', flexDirection: 'column', gap: 1,
+                              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                              gap: 2, padding: '5px 9px', borderRadius: 8, minWidth: 60,
+                              background: '#F7F7F5', border: '0.5px solid #E5E5E2',
+                              color: '#555', textDecoration: 'none', transition: 'all .15s',
                             }}
                             onMouseEnter={e => { e.currentTarget.style.background = '#111'; e.currentTarget.style.color = '#fff'; e.currentTarget.style.borderColor = '#111' }}
                             onMouseLeave={e => { e.currentTarget.style.background = '#F7F7F5'; e.currentTarget.style.color = '#555'; e.currentTarget.style.borderColor = '#E5E5E2' }}
                           >
                             <span style={{ fontSize: 12 }}>◈</span>
-                            <span style={{ fontSize: 7, letterSpacing: '.04em' }}>TT</span>
+                            <span style={{ fontSize: 8, letterSpacing: '.03em' }}>Métricas TT</span>
                           </a>
                         )}
                         {hasIG && (
                           <a href={camp.reporte_url_ig} target="_blank" rel="noopener noreferrer"
                             onClick={e => e.stopPropagation()}
-                            title="Reporte métricas Instagram"
+                            title="Métricas Instagram"
                             style={{
-                              width: 32, height: 32, borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                              background: '#F7F7F5', border: '0.5px solid #E5E5E2', color: '#555',
-                              textDecoration: 'none', fontSize: 12, transition: 'all .15s', flexDirection: 'column', gap: 1,
+                              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                              gap: 2, padding: '5px 9px', borderRadius: 8, minWidth: 60,
+                              background: '#F7F7F5', border: '0.5px solid #E5E5E2',
+                              color: '#555', textDecoration: 'none', transition: 'all .15s',
                             }}
                             onMouseEnter={e => { e.currentTarget.style.background = '#111'; e.currentTarget.style.color = '#fff'; e.currentTarget.style.borderColor = '#111' }}
                             onMouseLeave={e => { e.currentTarget.style.background = '#F7F7F5'; e.currentTarget.style.color = '#555'; e.currentTarget.style.borderColor = '#E5E5E2' }}
                           >
                             <span style={{ fontSize: 12 }}>◈</span>
-                            <span style={{ fontSize: 7, letterSpacing: '.04em' }}>IG</span>
+                            <span style={{ fontSize: 8, letterSpacing: '.03em' }}>Métricas IG</span>
                           </a>
                         )}
                       </div>
                     )}
                   </div>
+
                   <span style={{ fontSize: 16, color: '#CCC', flexShrink: 0 }}>›</span>
                 </div>
               )
