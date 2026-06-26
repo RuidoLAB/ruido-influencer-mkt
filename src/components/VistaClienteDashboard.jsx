@@ -77,6 +77,35 @@ function ProfileLink({ username, link }) {
   return <span style={{ fontSize: 13, color: '#555', fontWeight: 500 }}>{username}</span>
 }
 
+function ReporteCard({ url, plataforma }) {
+  const isTT = plataforma === 'TikTok'
+  const platBg = isTT ? '#F0F0EE' : '#FEF0FB'
+  const platColor = isTT ? '#555' : '#6B1560'
+  return (
+    <div style={{
+      background: '#111', borderRadius: 14, padding: '22px 28px',
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      gap: 20, flexWrap: 'wrap',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+        <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>◈</div>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+            <span style={{ fontSize: 15, fontWeight: 500, color: '#fff' }}>Reporte de métricas</span>
+            <span style={{ fontSize: 10.5, padding: '1px 7px', borderRadius: 20, background: platBg, color: platColor }}>{plataforma}</span>
+          </div>
+          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)' }}>Revisa el reporte completo de resultados de esta campaña.</div>
+        </div>
+      </div>
+      <a href={url} target="_blank" rel="noopener noreferrer"
+        style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 22px', borderRadius: 10, background: '#E8313A', color: '#fff', textDecoration: 'none', fontSize: 13.5, fontWeight: 500, flexShrink: 0, transition: 'background .15s' }}
+        onMouseEnter={e => e.currentTarget.style.background = '#c9242c'}
+        onMouseLeave={e => e.currentTarget.style.background = '#E8313A'}
+      >Ver reporte métricas ↗</a>
+    </div>
+  )
+}
+
 export default function VistaClienteDashboard({ token }) {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -107,12 +136,12 @@ export default function VistaClienteDashboard({ token }) {
       }
 
       const clientInfo = tokenData[0]
-
       const camps = await sql`
         SELECT
           c.id, c.nombre, c.artista, c.cancion, c.estado,
           c.fecha_inicio, c.fecha_termino, c.plataforma,
           c.share_token, c.share_active,
+          c.reporte_url_tt, c.reporte_url_ig,
           COUNT(DISTINCT ci.id) AS total_influencers,
           COUNT(DISTINCT CASE WHEN ci.video_link_tt != '' OR ci.video_link_ig != '' THEN ci.id END) AS videos_publicados
         FROM campaigns c
@@ -121,14 +150,12 @@ export default function VistaClienteDashboard({ token }) {
         GROUP BY c.id
         ORDER BY c.created_at DESC
       `
-
       setData({ client: clientInfo, camps })
     } catch (e) { console.error(e); setError('error') }
     setLoading(false)
   }
 
   async function openCamp(camp) {
-    // Cargar influencers de la campaña
     try {
       const rows = await sql`
         SELECT
@@ -166,16 +193,26 @@ export default function VistaClienteDashboard({ token }) {
   const { client, camps } = data
   const brandColor = client.color || '#E8313A'
 
-  // Vista de campaña individual
+  // ─── VISTA CAMPAÑA INDIVIDUAL ───
   if (selectedCamp) {
     const plat = selectedCamp.plataforma || 'Ambas'
     const showIG = plat === 'Ambas' || plat === 'Instagram'
     const showTT = plat === 'Ambas' || plat === 'TikTok'
+    const showBoth = plat === 'Ambas'
     const totalIG = selectedCamp.influencers.reduce((s, i) => s + Number(i.ig_seguidores), 0)
     const totalTT = selectedCamp.influencers.reduce((s, i) => s + Number(i.tt_seguidores), 0)
+    const totalSeg = (showIG ? totalIG : 0) + (showTT ? totalTT : 0)
     const hasVideoTT = showTT && selectedCamp.influencers.some(i => i.video_link_tt)
     const hasVideoIG = showIG && selectedCamp.influencers.some(i => i.video_link_ig)
     const hasBoostcode = selectedCamp.influencers.some(i => i.boostcode && i.boostcode.trim())
+    const hasReporteTT = showTT && selectedCamp.reporte_url_tt
+    const hasReporteIG = showIG && selectedCamp.reporte_url_ig
+    const hasAnyReporte = hasReporteTT || hasReporteIG
+
+    const thStyle = {
+      padding: '11px 16px', textAlign: 'left', fontSize: 10.5,
+      fontWeight: 500, textTransform: 'uppercase', letterSpacing: '.08em', color: '#AAA',
+    }
 
     return (
       <div style={{ minHeight: '100vh', background: '#F7F7F5', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
@@ -187,14 +224,59 @@ export default function VistaClienteDashboard({ token }) {
             </div>
             <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)' }}>{client.client_nombre}</span>
             <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.3)' }}>·</span>
-            <span
-              style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', cursor: 'pointer' }}
-              onClick={() => setSelectedCamp(null)}
-            >← Volver</span>
+            <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', cursor: 'pointer' }} onClick={() => setSelectedCamp(null)}>
+              ← Volver
+            </span>
           </div>
-          <h1 style={{ fontSize: 20, fontWeight: 500, color: '#fff', marginBottom: 2 }}>{selectedCamp.nombre}</h1>
-          {selectedCamp.artista && <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)' }}>{selectedCamp.artista}{selectedCamp.cancion ? ` — "${selectedCamp.cancion}"` : ''}</p>}
-          <div style={{ display: 'flex', gap: 20, marginTop: 16, flexWrap: 'wrap' }}>
+
+          {/* Título + botones reporte */}
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, marginBottom: 16 }}>
+            <div>
+              <h1 style={{ fontSize: 20, fontWeight: 500, color: '#fff', marginBottom: 2 }}>{selectedCamp.nombre}</h1>
+              {selectedCamp.artista && (
+                <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)' }}>
+                  {selectedCamp.artista}{selectedCamp.cancion ? ` — "${selectedCamp.cancion}"` : ''}
+                </p>
+              )}
+            </div>
+            {hasAnyReporte && (
+              <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+                {hasReporteTT && (
+                  <a href={selectedCamp.reporte_url_tt} target="_blank" rel="noopener noreferrer" title="Reporte métricas TikTok"
+                    style={{
+                      width: 34, height: 34, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      background: 'rgba(255,255,255,0.08)', border: '0.5px solid rgba(255,255,255,0.15)',
+                      color: '#fff', textDecoration: 'none', fontSize: 13, transition: 'all .15s', flexShrink: 0,
+                      flexDirection: 'column', gap: 1,
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.16)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.3)' }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.15)' }}
+                  >
+                    <span style={{ fontSize: 13 }}>◈</span>
+                    <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', letterSpacing: '.04em' }}>TT</span>
+                  </a>
+                )}
+                {hasReporteIG && (
+                  <a href={selectedCamp.reporte_url_ig} target="_blank" rel="noopener noreferrer" title="Reporte métricas Instagram"
+                    style={{
+                      width: 34, height: 34, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      background: 'rgba(255,255,255,0.08)', border: '0.5px solid rgba(255,255,255,0.15)',
+                      color: '#fff', textDecoration: 'none', fontSize: 13, transition: 'all .15s', flexShrink: 0,
+                      flexDirection: 'column', gap: 1,
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.16)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.3)' }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.15)' }}
+                  >
+                    <span style={{ fontSize: 13 }}>◈</span>
+                    <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', letterSpacing: '.04em' }}>IG</span>
+                  </a>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Stats */}
+          <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
             <div>
               <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 3 }}>Influencers</div>
               <div style={{ fontSize: 18, fontWeight: 500, color: '#fff' }}>{selectedCamp.influencers.length}</div>
@@ -207,6 +289,10 @@ export default function VistaClienteDashboard({ token }) {
               <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 3 }}>TikTok</div>
               <div style={{ fontSize: 18, fontWeight: 500, color: '#fff' }}>{fmtSeg(totalTT)}</div>
             </div>}
+            {showBoth && <div>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 3 }}>Alcance total</div>
+              <div style={{ fontSize: 18, fontWeight: 500, color: '#fff' }}>{fmtSeg(totalSeg)}</div>
+            </div>}
           </div>
         </div>
 
@@ -217,13 +303,13 @@ export default function VistaClienteDashboard({ token }) {
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ background: '#F7F7F5', borderBottom: '0.5px solid #E5E5E2' }}>
-                    <th style={{ padding: '11px 16px', textAlign: 'left', fontSize: 10.5, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '.08em', color: '#AAA', minWidth: 180 }}>Influencer</th>
-                    {showIG && <th style={{ padding: '11px 16px', textAlign: 'left', fontSize: 10.5, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '.08em', color: '#AAA', minWidth: 140 }}>Instagram</th>}
-                    {showTT && <th style={{ padding: '11px 16px', textAlign: 'left', fontSize: 10.5, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '.08em', color: '#AAA', minWidth: 140 }}>TikTok</th>}
-                    <th style={{ padding: '11px 16px', textAlign: 'left', fontSize: 10.5, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '.08em', color: '#AAA', minWidth: 140 }}>Categorías</th>
-                    {hasVideoIG && <th style={{ padding: '11px 16px', textAlign: 'left', fontSize: 10.5, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '.08em', color: '#AAA', minWidth: 80 }}>Post IG</th>}
-                    {hasVideoTT && <th style={{ padding: '11px 16px', textAlign: 'left', fontSize: 10.5, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '.08em', color: '#AAA', minWidth: 80 }}>Video TT</th>}
-                    {hasBoostcode && <th style={{ padding: '11px 16px', textAlign: 'left', fontSize: 10.5, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '.08em', color: '#AAA', minWidth: 110 }}>Boostcode</th>}
+                    <th style={{ ...thStyle, minWidth: 180 }}>Influencer</th>
+                    {showIG && <th style={{ ...thStyle, minWidth: 150 }}>Instagram</th>}
+                    {showTT && <th style={{ ...thStyle, minWidth: 150 }}>TikTok</th>}
+                    <th style={{ ...thStyle, minWidth: 140 }}>Categorías</th>
+                    {hasVideoIG && <th style={{ ...thStyle, minWidth: 80 }}>Post IG</th>}
+                    {hasVideoTT && <th style={{ ...thStyle, minWidth: 80 }}>Video TT</th>}
+                    {hasBoostcode && <th style={{ ...thStyle, minWidth: 110 }}>Boostcode</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -267,6 +353,7 @@ export default function VistaClienteDashboard({ token }) {
                               const c = TIPO_COLORS[t] || TIPO_COLORS['Otros']
                               return <span key={t} style={{ background: c.bg, color: c.color, padding: '2px 8px', borderRadius: 20, fontSize: 11 }}>{t}</span>
                             })}
+                            {tipos.length === 0 && <span style={{ color: '#CCC', fontSize: 12 }}>—</span>}
                           </div>
                         </td>
                         {hasVideoIG && (
@@ -294,7 +381,7 @@ export default function VistaClienteDashboard({ token }) {
                         {hasBoostcode && (
                           <td style={{ padding: '13px 16px', verticalAlign: 'middle' }}>
                             {inf.boostcode && inf.boostcode.trim()
-                              ? <span style={{ fontFamily: 'monospace', fontSize: 13, fontWeight: 600, background: '#F7F7F5', border: '0.5px solid #E5E5E2', padding: '3px 10px', borderRadius: 6 }}>{inf.boostcode}</span>
+                              ? <span style={{ fontFamily: 'monospace', fontSize: 13, fontWeight: 600, background: '#F7F7F5', border: '0.5px solid #E5E5E2', padding: '3px 10px', borderRadius: 6, color: '#1A1A1A', letterSpacing: '.05em' }}>{inf.boostcode}</span>
                               : <span style={{ color: '#CCC', fontSize: 12 }}>—</span>}
                           </td>
                         )}
@@ -304,19 +391,50 @@ export default function VistaClienteDashboard({ token }) {
                 </tbody>
               </table>
             </div>
+
+            {/* Footer totales */}
+            <div style={{ padding: '14px 16px', background: '#F7F7F5', borderTop: '0.5px solid #E5E5E2', display: 'flex', justifyContent: 'flex-end', gap: 24 }}>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: 10.5, color: '#AAA', textTransform: 'uppercase', letterSpacing: '.07em' }}>Total influencers</div>
+                <div style={{ fontSize: 16, fontWeight: 500 }}>{selectedCamp.influencers.length}</div>
+              </div>
+              {showIG && <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: 10.5, color: '#AAA', textTransform: 'uppercase', letterSpacing: '.07em' }}>Instagram</div>
+                <div style={{ fontSize: 16, fontWeight: 500 }}>{fmtSeg(totalIG)}</div>
+              </div>}
+              {showTT && <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: 10.5, color: '#AAA', textTransform: 'uppercase', letterSpacing: '.07em' }}>TikTok</div>
+                <div style={{ fontSize: 16, fontWeight: 500 }}>{fmtSeg(totalTT)}</div>
+              </div>}
+              {showBoth && <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: 10.5, color: '#AAA', textTransform: 'uppercase', letterSpacing: '.07em' }}>Alcance total</div>
+                <div style={{ fontSize: 16, fontWeight: 500 }}>{fmtSeg(totalSeg)}</div>
+              </div>}
+            </div>
+          </div>
+
+          {/* Tarjetas reporte */}
+          {hasAnyReporte && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 20 }}>
+              {hasReporteTT && <ReporteCard url={selectedCamp.reporte_url_tt} plataforma="TikTok" />}
+              {hasReporteIG && <ReporteCard url={selectedCamp.reporte_url_ig} plataforma="Instagram" />}
+            </div>
+          )}
+
+          <div style={{ marginTop: 20, textAlign: 'center', fontSize: 11, color: '#CCC' }}>
+            Portal generado por RUIDO LAB — Influencer MKT
           </div>
         </div>
       </div>
     )
   }
 
-  // KPIs
+  // ─── VISTA LISTA DE CAMPAÑAS ───
   const totalCamps = camps.length
   const activas = camps.filter(c => c.estado === 'Activa').length
   const cerradas = camps.filter(c => c.estado === 'Cerrada').length
   const totalInfluencers = camps.reduce((s, c) => s + Number(c.total_influencers), 0)
   const totalVideos = camps.reduce((s, c) => s + Number(c.videos_publicados), 0)
-
   const anios = [...new Set(camps.map(c => c.created_at ? new Date(c.created_at).getFullYear() : null).filter(Boolean))].sort((a, b) => b - a)
 
   const filtered = camps
@@ -348,8 +466,6 @@ export default function VistaClienteDashboard({ token }) {
             <h1 style={{ fontSize: 22, fontWeight: 500, color: '#fff' }}>{client.client_nombre}</h1>
           </div>
         </div>
-
-        {/* KPIs en header */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, auto)', gap: 32, width: 'fit-content' }}>
           {[
             { label: 'Total campañas', value: totalCamps },
@@ -366,9 +482,7 @@ export default function VistaClienteDashboard({ token }) {
         </div>
       </div>
 
-      {/* Contenido */}
       <div style={{ padding: '28px 40px' }}>
-
         {/* Filtros */}
         <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
           <input className="input" placeholder="Buscar campaña, artista..."
@@ -391,13 +505,16 @@ export default function VistaClienteDashboard({ token }) {
           </select>
         </div>
 
-        {/* Lista de campañas */}
+        {/* Lista campañas */}
         {filtered.length === 0 ? (
           <div style={{ padding: 40, textAlign: 'center', color: '#AAA', fontSize: 13 }}>Sin resultados</div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {filtered.map(camp => {
               const ec = ESTADO_CAMP_COLORS[camp.estado] || ESTADO_CAMP_COLORS['Activa']
+              const plat = camp.plataforma || 'Ambas'
+              const hasTT = (plat === 'Ambas' || plat === 'TikTok') && camp.reporte_url_tt
+              const hasIG = (plat === 'Ambas' || plat === 'Instagram') && camp.reporte_url_ig
               return (
                 <div key={camp.id}
                   style={{
@@ -409,10 +526,7 @@ export default function VistaClienteDashboard({ token }) {
                   onMouseEnter={e => { e.currentTarget.style.borderColor = brandColor; e.currentTarget.style.transform = 'translateX(2px)' }}
                   onMouseLeave={e => { e.currentTarget.style.borderColor = '#E5E5E2'; e.currentTarget.style.transform = 'none' }}
                 >
-                  {/* Color strip */}
                   <div style={{ width: 3, height: 40, borderRadius: 2, background: brandColor, flexShrink: 0 }} />
-
-                  {/* Info principal */}
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
                       <span style={{ fontSize: 14, fontWeight: 500 }}>{camp.nombre}</span>
@@ -424,9 +538,7 @@ export default function VistaClienteDashboard({ token }) {
                       {!camp.artista && !camp.cancion && <span>Sin artista asignado</span>}
                     </div>
                   </div>
-
-                  {/* Stats */}
-                  <div style={{ display: 'flex', gap: 24, flexShrink: 0 }}>
+                  <div style={{ display: 'flex', gap: 24, flexShrink: 0, alignItems: 'center' }}>
                     <div style={{ textAlign: 'center' }}>
                       <div style={{ fontSize: 16, fontWeight: 500 }}>{camp.total_influencers}</div>
                       <div style={{ fontSize: 10, color: '#AAA', textTransform: 'uppercase', letterSpacing: '.06em' }}>Influs</div>
@@ -441,8 +553,44 @@ export default function VistaClienteDashboard({ token }) {
                       </div>
                       <div style={{ fontSize: 10, color: '#AAA', textTransform: 'uppercase', letterSpacing: '.06em' }}>Inicio</div>
                     </div>
+                    {/* Botones reporte minimalistas */}
+                    {(hasTT || hasIG) && (
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        {hasTT && (
+                          <a href={camp.reporte_url_tt} target="_blank" rel="noopener noreferrer"
+                            onClick={e => e.stopPropagation()}
+                            title="Reporte métricas TikTok"
+                            style={{
+                              width: 32, height: 32, borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              background: '#F7F7F5', border: '0.5px solid #E5E5E2', color: '#555',
+                              textDecoration: 'none', fontSize: 12, transition: 'all .15s', flexDirection: 'column', gap: 1,
+                            }}
+                            onMouseEnter={e => { e.currentTarget.style.background = '#111'; e.currentTarget.style.color = '#fff'; e.currentTarget.style.borderColor = '#111' }}
+                            onMouseLeave={e => { e.currentTarget.style.background = '#F7F7F5'; e.currentTarget.style.color = '#555'; e.currentTarget.style.borderColor = '#E5E5E2' }}
+                          >
+                            <span style={{ fontSize: 12 }}>◈</span>
+                            <span style={{ fontSize: 7, letterSpacing: '.04em' }}>TT</span>
+                          </a>
+                        )}
+                        {hasIG && (
+                          <a href={camp.reporte_url_ig} target="_blank" rel="noopener noreferrer"
+                            onClick={e => e.stopPropagation()}
+                            title="Reporte métricas Instagram"
+                            style={{
+                              width: 32, height: 32, borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              background: '#F7F7F5', border: '0.5px solid #E5E5E2', color: '#555',
+                              textDecoration: 'none', fontSize: 12, transition: 'all .15s', flexDirection: 'column', gap: 1,
+                            }}
+                            onMouseEnter={e => { e.currentTarget.style.background = '#111'; e.currentTarget.style.color = '#fff'; e.currentTarget.style.borderColor = '#111' }}
+                            onMouseLeave={e => { e.currentTarget.style.background = '#F7F7F5'; e.currentTarget.style.color = '#555'; e.currentTarget.style.borderColor = '#E5E5E2' }}
+                          >
+                            <span style={{ fontSize: 12 }}>◈</span>
+                            <span style={{ fontSize: 7, letterSpacing: '.04em' }}>IG</span>
+                          </a>
+                        )}
+                      </div>
+                    )}
                   </div>
-
                   <span style={{ fontSize: 16, color: '#CCC', flexShrink: 0 }}>›</span>
                 </div>
               )
