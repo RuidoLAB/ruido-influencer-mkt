@@ -82,7 +82,7 @@ export default function VistaCliente({ token }) {
     try {
       const rows = await sql`
         SELECT
-          c.nombre AS camp_nombre, c.cliente, c.plataforma,
+          c.nombre AS camp_nombre, c.cliente, c.plataforma, c.reporte_url,
           i.nombre,
           i.ig_usuario, i.ig_seguidores, i.ig_link,
           i.tt_usuario, i.tt_seguidores, i.tt_link,
@@ -102,10 +102,11 @@ export default function VistaCliente({ token }) {
           nombre: rows[0].camp_nombre,
           cliente: rows[0].cliente,
           plataforma: rows[0].plataforma || 'Ambas',
-         influencers: rows.sort((a, b) =>
-  (Number(b.ig_seguidores) + Number(b.tt_seguidores)) -
-  (Number(a.ig_seguidores) + Number(a.tt_seguidores))
-),
+          reporte_url: rows[0].reporte_url || '',
+          influencers: rows.sort((a, b) =>
+            (Number(b.ig_seguidores) + Number(b.tt_seguidores)) -
+            (Number(a.ig_seguidores) + Number(a.tt_seguidores))
+          ),
         })
       }
     } catch (e) { console.error(e); setError('error') }
@@ -141,7 +142,6 @@ export default function VistaCliente({ token }) {
   const totalTT = camp.influencers.reduce((s, i) => s + Number(i.tt_seguidores), 0)
   const totalSeg = (showIG ? totalIG : 0) + (showTT ? totalTT : 0)
 
-  // Columnas opcionales — solo aparecen si al menos uno tiene dato
   const hasVideoTT = showTT && camp.influencers.some(i => i.video_link_tt)
   const hasVideoIG = showIG && camp.influencers.some(i => i.video_link_ig)
   const hasBoostcode = camp.influencers.some(i => i.boostcode && i.boostcode.trim() !== '')
@@ -280,12 +280,7 @@ export default function VistaCliente({ token }) {
                       {hasBoostcode && (
                         <td style={{ padding: '13px 16px', verticalAlign: 'middle' }}>
                           {inf.boostcode && inf.boostcode.trim()
-                            ? <span style={{
-                                fontFamily: 'monospace', fontSize: 13, fontWeight: 600,
-                                background: '#F7F7F5', border: '0.5px solid #E5E5E2',
-                                padding: '3px 10px', borderRadius: 6, color: '#1A1A1A',
-                                letterSpacing: '.05em',
-                              }}>{inf.boostcode}</span>
+                            ? <span style={{ fontFamily: 'monospace', fontSize: 13, fontWeight: 600, background: '#F7F7F5', border: '0.5px solid #E5E5E2', padding: '3px 10px', borderRadius: 6, color: '#1A1A1A', letterSpacing: '.05em' }}>{inf.boostcode}</span>
                             : <span style={{ color: '#CCC', fontSize: 12 }}>—</span>
                           }
                         </td>
@@ -297,7 +292,7 @@ export default function VistaCliente({ token }) {
             </table>
           </div>
 
-          {/* Footer */}
+          {/* Footer totales */}
           <div style={{ padding: '14px 16px', background: '#F7F7F5', borderTop: '0.5px solid #E5E5E2', display: 'flex', justifyContent: 'flex-end', gap: 24 }}>
             <div style={{ textAlign: 'right' }}>
               <div style={{ fontSize: 10.5, color: '#AAA', textTransform: 'uppercase', letterSpacing: '.07em' }}>Total influencers</div>
@@ -323,6 +318,54 @@ export default function VistaCliente({ token }) {
             )}
           </div>
         </div>
+
+        {/* Tarjeta reporte de métricas — solo si existe el link */}
+        {camp.reporte_url && (
+          <div style={{
+            marginTop: 20,
+            background: '#111',
+            borderRadius: 14,
+            padding: '22px 28px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 20,
+            flexWrap: 'wrap',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+              <div style={{
+                width: 44, height: 44, borderRadius: 12,
+                background: 'rgba(255,255,255,0.08)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 20, flexShrink: 0,
+              }}>◈</div>
+              <div>
+                <div style={{ fontSize: 15, fontWeight: 500, color: '#fff', marginBottom: 3 }}>
+                  Reporte de métricas
+                </div>
+                <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)' }}>
+                  Revisa el reporte completo de resultados de esta campaña.
+                </div>
+              </div>
+            </div>
+            <a
+              href={camp.reporte_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                padding: '10px 22px', borderRadius: 10,
+                background: '#E8313A', color: '#fff',
+                textDecoration: 'none', fontSize: 13.5, fontWeight: 500,
+                flexShrink: 0, transition: 'background .15s',
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = '#c9242c'}
+              onMouseLeave={e => e.currentTarget.style.background = '#E8313A'}
+            >
+              Ver reporte métricas ↗
+            </a>
+          </div>
+        )}
 
         <div style={{ marginTop: 20, textAlign: 'center', fontSize: 11, color: '#CCC' }}>
           Propuesta generada por RUIDO LAB — Influencer MKT
