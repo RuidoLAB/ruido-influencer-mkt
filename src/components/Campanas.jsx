@@ -80,13 +80,11 @@ function fmtMoney(n, moneda) {
 }
 
 function isValidUrl(url) {
-  if (!url || !url.trim()) return true // opcional
+  if (!url || !url.trim()) return true
   try {
     const u = new URL(url)
     return u.protocol === 'https:' || u.protocol === 'http:'
-  } catch {
-    return false
-  }
+  } catch { return false }
 }
 
 function Avatar({ nombre, index, size = 30 }) {
@@ -171,7 +169,7 @@ function BudgetSummary({ camp }) {
 const EMPTY_CAMP = {
   nombre: '', cliente: '', client_id: '', budget: '', moneda: 'CLP',
   brief: '', plataforma: 'Ambas', artista: '', cancion: '',
-  fecha_inicio: '', fecha_termino: '', reporte_url: '',
+  fecha_inicio: '', fecha_termino: '', reporte_url_tt: '', reporte_url_ig: '',
 }
 const EMPTY_CI_EDIT = { costo: '', piezas: '1', estado: 'Contactado', notas: '', video_link_tt: '', video_link_ig: '', boostcode: '' }
 
@@ -246,7 +244,8 @@ export default function Campanas({ initialCamp = null }) {
             plataforma: row.plataforma || 'Ambas',
             artista: row.artista || '', cancion: row.cancion || '',
             fecha_inicio: row.fecha_inicio || '', fecha_termino: row.fecha_termino || '',
-            reporte_url: row.reporte_url || '',
+            reporte_url_tt: row.reporte_url_tt || '',
+            reporte_url_ig: row.reporte_url_ig || '',
             influencers: [],
           }
         }
@@ -294,17 +293,26 @@ export default function Campanas({ initialCamp = null }) {
     } catch (e) { console.error(e) }
   }
 
+  function validateForm(form) {
+    const plat = form.plataforma
+    const showTT = plat === 'Ambas' || plat === 'TikTok'
+    const showIG = plat === 'Ambas' || plat === 'Instagram'
+    if (showTT && form.reporte_url_tt && !isValidUrl(form.reporte_url_tt))
+      return 'El link del reporte TikTok no es una URL válida.'
+    if (showIG && form.reporte_url_ig && !isValidUrl(form.reporte_url_ig))
+      return 'El link del reporte Instagram no es una URL válida.'
+    return ''
+  }
+
   async function saveCamp() {
     if (!campForm.nombre.trim()) return
-    if (campForm.reporte_url && !isValidUrl(campForm.reporte_url)) {
-      setCampFormError('El link del reporte no es una URL válida.')
-      return
-    }
+    const err = validateForm(campForm)
+    if (err) { setCampFormError(err); return }
     setCampFormError('')
     setSavingCamp(true)
     try {
       await sql`
-        INSERT INTO campaigns (nombre, cliente, client_id, budget, moneda, brief, plataforma, share_token, artista, cancion, fecha_inicio, fecha_termino, reporte_url)
+        INSERT INTO campaigns (nombre, cliente, client_id, budget, moneda, brief, plataforma, share_token, artista, cancion, fecha_inicio, fecha_termino, reporte_url_tt, reporte_url_ig)
         VALUES (
           ${campForm.nombre},
           ${campForm.client_id ? (clientsList.find(c => c.id === campForm.client_id)?.nombre || '') : campForm.cliente},
@@ -314,7 +322,7 @@ export default function Campanas({ initialCamp = null }) {
           ${campForm.plataforma}, ${crypto.randomUUID()},
           ${campForm.artista}, ${campForm.cancion},
           ${campForm.fecha_inicio || null}, ${campForm.fecha_termino || null},
-          ${campForm.reporte_url || ''}
+          ${campForm.reporte_url_tt || ''}, ${campForm.reporte_url_ig || ''}
         )
       `
       setModalNewCamp(false)
@@ -337,7 +345,8 @@ export default function Campanas({ initialCamp = null }) {
       cancion: currentCamp.cancion || '',
       fecha_inicio: currentCamp.fecha_inicio || '',
       fecha_termino: currentCamp.fecha_termino || '',
-      reporte_url: currentCamp.reporte_url || '',
+      reporte_url_tt: currentCamp.reporte_url_tt || '',
+      reporte_url_ig: currentCamp.reporte_url_ig || '',
     })
     setEditCampFormError('')
     setEditCampModal(true)
@@ -345,10 +354,8 @@ export default function Campanas({ initialCamp = null }) {
 
   async function saveEditCamp() {
     if (!editCampForm.nombre.trim()) return
-    if (editCampForm.reporte_url && !isValidUrl(editCampForm.reporte_url)) {
-      setEditCampFormError('El link del reporte no es una URL válida.')
-      return
-    }
+    const err = validateForm(editCampForm)
+    if (err) { setEditCampFormError(err); return }
     setEditCampFormError('')
     setSavingEditCamp(true)
     try {
@@ -365,7 +372,8 @@ export default function Campanas({ initialCamp = null }) {
           cancion = ${editCampForm.cancion},
           fecha_inicio = ${editCampForm.fecha_inicio || null},
           fecha_termino = ${editCampForm.fecha_termino || null},
-          reporte_url = ${editCampForm.reporte_url || ''}
+          reporte_url_tt = ${editCampForm.reporte_url_tt || ''},
+          reporte_url_ig = ${editCampForm.reporte_url_ig || ''}
         WHERE id = ${currentCamp.id}
       `
       setEditCampModal(false)
@@ -503,6 +511,26 @@ export default function Campanas({ initialCamp = null }) {
   const showIG = plat === 'Ambas' || plat === 'Instagram'
   const showTT = plat === 'Ambas' || plat === 'TikTok'
 
+  function UrlField({ label, value, onChange, error }) {
+    return (
+      <div className="fg">
+        <label className="label">{label}</label>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <input className="input" value={value} onChange={onChange}
+            placeholder="https://..." style={{ flex: 1 }} />
+          {value && isValidUrl(value) && (
+            <a href={value} target="_blank" rel="noopener noreferrer"
+              style={{ display: 'flex', alignItems: 'center', padding: '0 12px', background: '#F7F7F5', border: '0.5px solid #E5E5E2', borderRadius: 8, fontSize: 12, color: '#555', textDecoration: 'none', whiteSpace: 'nowrap', flexShrink: 0 }}
+              onMouseEnter={e => e.currentTarget.style.background = '#EFEFED'}
+              onMouseLeave={e => e.currentTarget.style.background = '#F7F7F5'}
+            >Abrir ↗</a>
+          )}
+        </div>
+        {error && <div style={{ fontSize: 12, color: '#A32D2D', marginTop: 5 }}>⚠ {error}</div>}
+      </div>
+    )
+  }
+
   function VideoLinkFields({ form, setForm }) {
     return (
       <>
@@ -555,6 +583,9 @@ export default function Campanas({ initialCamp = null }) {
   }
 
   function CampFormFields({ form, setForm, error }) {
+    const fPlat = form.plataforma
+    const fShowTT = fPlat === 'Ambas' || fPlat === 'TikTok'
+    const fShowIG = fPlat === 'Ambas' || fPlat === 'Instagram'
     return (
       <>
         <div className="fg">
@@ -623,24 +654,27 @@ export default function Campanas({ initialCamp = null }) {
           <textarea className="input" rows={3} value={form.brief}
             onChange={e => setForm(f => ({ ...f, brief: e.target.value }))} style={{ resize: 'vertical' }} />
         </div>
-        <div className="fg">
-          <label className="label">Reporte de métricas — URL (opcional)</label>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <input className="input" value={form.reporte_url}
-              onChange={e => setForm(f => ({ ...f, reporte_url: e.target.value }))}
-              placeholder="https://..." style={{ flex: 1 }} />
-            {form.reporte_url && isValidUrl(form.reporte_url) && (
-              <a href={form.reporte_url} target="_blank" rel="noopener noreferrer"
-                style={{ display: 'flex', alignItems: 'center', padding: '0 12px', background: '#F7F7F5', border: '0.5px solid #E5E5E2', borderRadius: 8, fontSize: 12, color: '#555', textDecoration: 'none', whiteSpace: 'nowrap', flexShrink: 0 }}
-                onMouseEnter={e => e.currentTarget.style.background = '#EFEFED'}
-                onMouseLeave={e => e.currentTarget.style.background = '#F7F7F5'}
-              >Abrir ↗</a>
-            )}
-          </div>
-          {error && (
-            <div style={{ fontSize: 12, color: '#A32D2D', marginTop: 5 }}>⚠ {error}</div>
-          )}
-        </div>
+
+        {/* Reportes de métricas según plataforma */}
+        {fShowTT && (
+          <UrlField
+            label="Reporte métricas TikTok (opcional)"
+            value={form.reporte_url_tt}
+            onChange={e => setForm(f => ({ ...f, reporte_url_tt: e.target.value }))}
+            error={error?.includes('TikTok') ? error : ''}
+          />
+        )}
+        {fShowIG && (
+          <UrlField
+            label="Reporte métricas Instagram (opcional)"
+            value={form.reporte_url_ig}
+            onChange={e => setForm(f => ({ ...f, reporte_url_ig: e.target.value }))}
+            error={error?.includes('Instagram') ? error : ''}
+          />
+        )}
+        {error && !error.includes('TikTok') && !error.includes('Instagram') && (
+          <div style={{ fontSize: 12, color: '#A32D2D', marginTop: 2 }}>⚠ {error}</div>
+        )}
       </>
     )
   }
@@ -651,6 +685,9 @@ export default function Campanas({ initialCamp = null }) {
   if (currentCamp) {
     const ec = ESTADO_CAMP_COLORS[currentCamp.estado] || ESTADO_CAMP_COLORS['Activa']
     const clientColor = currentCamp.client_color || '#E8313A'
+    const hasReporteTT = showTT && currentCamp.reporte_url_tt
+    const hasReporteIG = showIG && currentCamp.reporte_url_ig
+
     return (
       <div style={{ padding: '20px 24px' }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20 }}>
@@ -674,18 +711,24 @@ export default function Campanas({ initialCamp = null }) {
             </div>
           </div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-            {currentCamp.reporte_url && (
-              <a href={currentCamp.reporte_url} target="_blank" rel="noopener noreferrer"
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 6,
-                  padding: '7px 14px', borderRadius: 8, fontSize: 12.5,
-                  background: '#1A1A1A', color: '#fff', textDecoration: 'none',
-                  border: '0.5px solid #1A1A1A', transition: 'all .15s',
-                }}
-                onMouseEnter={e => { e.currentTarget.style.background = '#333' }}
-                onMouseLeave={e => { e.currentTarget.style.background = '#1A1A1A' }}
+            {hasReporteTT && (
+              <a href={currentCamp.reporte_url_tt} target="_blank" rel="noopener noreferrer"
+                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8, fontSize: 12.5, background: '#1A1A1A', color: '#fff', textDecoration: 'none', border: '0.5px solid #1A1A1A', transition: 'all .15s' }}
+                onMouseEnter={e => e.currentTarget.style.background = '#333'}
+                onMouseLeave={e => e.currentTarget.style.background = '#1A1A1A'}
               >
-                <span style={{ fontSize: 14 }}>◈</span> Ver reporte métricas
+                <span style={{ fontSize: 11, background: '#F0F0EE', color: '#555', padding: '1px 5px', borderRadius: 4 }}>TT</span>
+                Ver reporte métricas
+              </a>
+            )}
+            {hasReporteIG && (
+              <a href={currentCamp.reporte_url_ig} target="_blank" rel="noopener noreferrer"
+                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8, fontSize: 12.5, background: '#1A1A1A', color: '#fff', textDecoration: 'none', border: '0.5px solid #1A1A1A', transition: 'all .15s' }}
+                onMouseEnter={e => e.currentTarget.style.background = '#333'}
+                onMouseLeave={e => e.currentTarget.style.background = '#1A1A1A'}
+              >
+                <span style={{ fontSize: 11, background: '#FEF0FB', color: '#6B1560', padding: '1px 5px', borderRadius: 4 }}>IG</span>
+                Ver reporte métricas
               </a>
             )}
             <button className="btn-ghost" onClick={openEditCamp}>✎ Editar</button>
@@ -723,7 +766,6 @@ export default function Campanas({ initialCamp = null }) {
           ))}
         </div>
 
-        {/* TAB INFLUENCERS */}
         {campTab === 'influencers' && (
           <div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
@@ -832,7 +874,6 @@ export default function Campanas({ initialCamp = null }) {
         {campTab === 'pagos' && <Pagos camp={currentCamp} onUpdate={fetchCamps} />}
         {campTab === 'reportes' && <Reportes camp={currentCamp} roster={roster} />}
 
-        {/* Modal editar campaña */}
         <Modal open={editCampModal} onClose={() => setEditCampModal(false)} title="Editar campaña">
           <CampFormFields form={editCampForm} setForm={setEditCampForm} error={editCampFormError} />
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
@@ -843,7 +884,6 @@ export default function Campanas({ initialCamp = null }) {
           </div>
         </Modal>
 
-        {/* Modal cambiar estado */}
         <Modal open={changeEstadoModal} onClose={() => setChangeEstadoModal(false)} title="Cambiar estado">
           <p style={{ fontSize: 13, color: '#888', marginBottom: 16 }}>Estado actual: <strong>{currentCamp.estado}</strong></p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
@@ -868,7 +908,6 @@ export default function Campanas({ initialCamp = null }) {
           </div>
         </Modal>
 
-        {/* Modal agregar influencers */}
         <Modal open={modalAddInf} onClose={() => setModalAddInf(false)} title="Agregar influencers">
           <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
             <input className="input" placeholder="Buscar..." value={infSearch} onChange={e => setInfSearch(e.target.value)} style={{ flex: 1 }} />
@@ -925,7 +964,6 @@ export default function Campanas({ initialCamp = null }) {
           </div>
         </Modal>
 
-        {/* Modal editar influencer */}
         <Modal open={editCIModal} onClose={() => setEditCIModal(false)} title={`Editar — ${editCI?.nombre}`}>
           <div className="form-row-2">
             <div className="fg">
