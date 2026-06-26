@@ -70,6 +70,59 @@ function ProfileLink({ username, link }) {
   return <span style={{ fontSize: 13, color: '#555', fontWeight: 500 }}>{username}</span>
 }
 
+function ReporteCard({ url, plataforma }) {
+  const isTT = plataforma === 'TikTok'
+  const platLabel = isTT ? 'TikTok' : 'Instagram'
+  const platBg = isTT ? '#F0F0EE' : '#FEF0FB'
+  const platColor = isTT ? '#555' : '#6B1560'
+
+  return (
+    <div style={{
+      background: '#111', borderRadius: 14,
+      padding: '22px 28px',
+      display: 'flex', alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 20, flexWrap: 'wrap',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+        <div style={{
+          width: 44, height: 44, borderRadius: 12,
+          background: 'rgba(255,255,255,0.08)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 20, flexShrink: 0,
+        }}>◈</div>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+            <span style={{ fontSize: 15, fontWeight: 500, color: '#fff' }}>Reporte de métricas</span>
+            <span style={{ fontSize: 10.5, padding: '1px 7px', borderRadius: 20, background: platBg, color: platColor }}>
+              {platLabel}
+            </span>
+          </div>
+          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)' }}>
+            Revisa el reporte completo de resultados de esta campaña.
+          </div>
+        </div>
+      </div>
+      <a
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          padding: '10px 22px', borderRadius: 10,
+          background: '#E8313A', color: '#fff',
+          textDecoration: 'none', fontSize: 13.5, fontWeight: 500,
+          flexShrink: 0, transition: 'background .15s',
+        }}
+        onMouseEnter={e => e.currentTarget.style.background = '#c9242c'}
+        onMouseLeave={e => e.currentTarget.style.background = '#E8313A'}
+      >
+        Ver reporte métricas ↗
+      </a>
+    </div>
+  )
+}
+
 export default function VistaCliente({ token }) {
   const [camp, setCamp] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -82,7 +135,8 @@ export default function VistaCliente({ token }) {
     try {
       const rows = await sql`
         SELECT
-          c.nombre AS camp_nombre, c.cliente, c.plataforma, c.reporte_url,
+          c.nombre AS camp_nombre, c.cliente, c.plataforma,
+          c.reporte_url_tt, c.reporte_url_ig,
           i.nombre,
           i.ig_usuario, i.ig_seguidores, i.ig_link,
           i.tt_usuario, i.tt_seguidores, i.tt_link,
@@ -102,7 +156,8 @@ export default function VistaCliente({ token }) {
           nombre: rows[0].camp_nombre,
           cliente: rows[0].cliente,
           plataforma: rows[0].plataforma || 'Ambas',
-          reporte_url: rows[0].reporte_url || '',
+          reporte_url_tt: rows[0].reporte_url_tt || '',
+          reporte_url_ig: rows[0].reporte_url_ig || '',
           influencers: rows.sort((a, b) =>
             (Number(b.ig_seguidores) + Number(b.tt_seguidores)) -
             (Number(a.ig_seguidores) + Number(a.tt_seguidores))
@@ -145,6 +200,10 @@ export default function VistaCliente({ token }) {
   const hasVideoTT = showTT && camp.influencers.some(i => i.video_link_tt)
   const hasVideoIG = showIG && camp.influencers.some(i => i.video_link_ig)
   const hasBoostcode = camp.influencers.some(i => i.boostcode && i.boostcode.trim() !== '')
+
+  const hasReporteTT = showTT && camp.reporte_url_tt
+  const hasReporteIG = showIG && camp.reporte_url_ig
+  const hasAnyReporte = hasReporteTT || hasReporteIG
 
   const thStyle = {
     padding: '11px 16px', textAlign: 'left', fontSize: 10.5,
@@ -193,8 +252,9 @@ export default function VistaCliente({ token }) {
         </div>
       </div>
 
-      {/* Tabla */}
       <div style={{ padding: '28px 40px' }}>
+
+        {/* Tabla influencers */}
         <div style={{ background: '#fff', border: '0.5px solid #E5E5E2', borderRadius: 12, overflow: 'hidden' }}>
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -319,51 +379,11 @@ export default function VistaCliente({ token }) {
           </div>
         </div>
 
-        {/* Tarjeta reporte de métricas — solo si existe el link */}
-        {camp.reporte_url && (
-          <div style={{
-            marginTop: 20,
-            background: '#111',
-            borderRadius: 14,
-            padding: '22px 28px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: 20,
-            flexWrap: 'wrap',
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-              <div style={{
-                width: 44, height: 44, borderRadius: 12,
-                background: 'rgba(255,255,255,0.08)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 20, flexShrink: 0,
-              }}>◈</div>
-              <div>
-                <div style={{ fontSize: 15, fontWeight: 500, color: '#fff', marginBottom: 3 }}>
-                  Reporte de métricas
-                </div>
-                <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)' }}>
-                  Revisa el reporte completo de resultados de esta campaña.
-                </div>
-              </div>
-            </div>
-            <a
-              href={camp.reporte_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{
-                display: 'flex', alignItems: 'center', gap: 8,
-                padding: '10px 22px', borderRadius: 10,
-                background: '#E8313A', color: '#fff',
-                textDecoration: 'none', fontSize: 13.5, fontWeight: 500,
-                flexShrink: 0, transition: 'background .15s',
-              }}
-              onMouseEnter={e => e.currentTarget.style.background = '#c9242c'}
-              onMouseLeave={e => e.currentTarget.style.background = '#E8313A'}
-            >
-              Ver reporte métricas ↗
-            </a>
+        {/* Tarjetas de reporte — solo si existen */}
+        {hasAnyReporte && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 20 }}>
+            {hasReporteTT && <ReporteCard url={camp.reporte_url_tt} plataforma="TikTok" />}
+            {hasReporteIG && <ReporteCard url={camp.reporte_url_ig} plataforma="Instagram" />}
           </div>
         )}
 
