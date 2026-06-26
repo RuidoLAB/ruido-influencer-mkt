@@ -45,6 +45,13 @@ function fmtSeg(n) {
   return n.toLocaleString('es-CL')
 }
 
+function fmtNum(n) {
+  n = Number(n) || 0
+  if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M'
+  if (n >= 1000) return Math.round(n / 1000) + 'K'
+  return n.toLocaleString('es-CL')
+}
+
 function Avatar({ nombre, index, size = 36 }) {
   const c = AV_COLORS[index % AV_COLORS.length]
   return (
@@ -70,32 +77,24 @@ function ProfileLink({ username, link }) {
   return <span style={{ fontSize: 13, color: '#555', fontWeight: 500 }}>{username}</span>
 }
 
-function ReporteCard({ url, plataforma }) {
+function ReporteBtn({ url, plataforma }) {
   const isTT = plataforma === 'TikTok'
-  const platBg = isTT ? '#F0F0EE' : '#FEF0FB'
-  const platColor = isTT ? '#555' : '#6B1560'
   return (
-    <div style={{
-      background: '#111', borderRadius: 14, padding: '22px 28px',
-      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      gap: 20, flexWrap: 'wrap',
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-        <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>◈</div>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-            <span style={{ fontSize: 15, fontWeight: 500, color: '#fff' }}>Reporte de métricas</span>
-            <span style={{ fontSize: 10.5, padding: '1px 7px', borderRadius: 20, background: platBg, color: platColor }}>{plataforma}</span>
-          </div>
-          <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)' }}>Revisa el reporte completo de resultados de esta campaña.</div>
-        </div>
-      </div>
-      <a href={url} target="_blank" rel="noopener noreferrer"
-        style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 22px', borderRadius: 10, background: '#E8313A', color: '#fff', textDecoration: 'none', fontSize: 13.5, fontWeight: 500, flexShrink: 0, transition: 'background .15s' }}
-        onMouseEnter={e => e.currentTarget.style.background = '#c9242c'}
-        onMouseLeave={e => e.currentTarget.style.background = '#E8313A'}
-      >Ver reporte métricas ↗</a>
-    </div>
+    <a href={url} target="_blank" rel="noopener noreferrer"
+      style={{
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        gap: 2, padding: '6px 12px', borderRadius: 8, minWidth: 70,
+        background: 'rgba(255,255,255,0.08)', border: '0.5px solid rgba(255,255,255,0.15)',
+        color: '#fff', textDecoration: 'none', transition: 'all .15s', flexShrink: 0,
+      }}
+      onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.18)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.35)' }}
+      onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.15)' }}
+    >
+      <span style={{ fontSize: 14 }}>◈</span>
+      <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.7)', letterSpacing: '.03em' }}>
+        Métricas {isTT ? 'TT' : 'IG'}
+      </span>
+    </a>
   )
 }
 
@@ -109,10 +108,53 @@ export default function VistaCliente({ token }) {
   async function fetchPublicCamp(t) {
     setLoading(true)
     try {
+      // Primero traer datos de la campaña
+      const campData = await sql`
+        SELECT
+          nombre AS camp_nombre, cliente, plataforma,
+          reporte_url_tt, reporte_url_ig,
+          tipo, contenidos_count, views_logradas,
+          artista, cancion
+        FROM campaigns
+        WHERE share_token = ${t} AND share_active = true
+        LIMIT 1
+      `
+      if (campData.length === 0) {
+        const check = await sql`SELECT id FROM campaigns WHERE share_token = ${t}`
+        setError(check.length === 0 ? 'not_found' : 'inactive')
+        setLoading(false)
+        return
+      }
+
+      const campInfo = campData[0]
+      const isEspecial = campInfo.tipo === 'Nano Blast' || campInfo.tipo === 'Clipping'
+
+      // Para campañas especiales no cargamos influencers
+      if (isEspecial) {
+        setCamp({
+          nombre: campInfo.camp_nombre,
+          cliente: campInfo.cliente,
+          plataforma: campInfo.plataforma || 'Ambas',
+          reporte_url_tt: campInfo.reporte_url_tt || '',
+          reporte_url_ig: campInfo.reporte_url_ig || '',
+          tipo: campInfo.tipo,
+          contenidos_count: campInfo.contenidos_count || 0,
+          views_logradas: campInfo.views_logradas || 0,
+          artista: campInfo.artista || '',
+          cancion: campInfo.cancion || '',
+          influencers: [],
+        })
+        setLoading(false)
+        return
+      }
+
+      // Campaña estándar — cargar influencers
       const rows = await sql`
         SELECT
           c.nombre AS camp_nombre, c.cliente, c.plataforma,
           c.reporte_url_tt, c.reporte_url_ig,
+          c.tipo, c.contenidos_count, c.views_logradas,
+          c.artista, c.cancion,
           i.nombre,
           i.ig_usuario, i.ig_seguidores, i.ig_link,
           i.tt_usuario, i.tt_seguidores, i.tt_link,
@@ -124,22 +166,22 @@ export default function VistaCliente({ token }) {
         JOIN influencers i ON i.id = ci.influencer_id
         WHERE c.share_token = ${t} AND c.share_active = true
       `
-      if (rows.length === 0) {
-        const check = await sql`SELECT id FROM campaigns WHERE share_token = ${t}`
-        setError(check.length === 0 ? 'not_found' : 'inactive')
-      } else {
-        setCamp({
-          nombre: rows[0].camp_nombre,
-          cliente: rows[0].cliente,
-          plataforma: rows[0].plataforma || 'Ambas',
-          reporte_url_tt: rows[0].reporte_url_tt || '',
-          reporte_url_ig: rows[0].reporte_url_ig || '',
-          influencers: rows.sort((a, b) =>
-            (Number(b.ig_seguidores) + Number(b.tt_seguidores)) -
-            (Number(a.ig_seguidores) + Number(a.tt_seguidores))
-          ),
-        })
-      }
+      setCamp({
+        nombre: rows[0].camp_nombre,
+        cliente: rows[0].cliente,
+        plataforma: rows[0].plataforma || 'Ambas',
+        reporte_url_tt: rows[0].reporte_url_tt || '',
+        reporte_url_ig: rows[0].reporte_url_ig || '',
+        tipo: rows[0].tipo || 'Estándar',
+        contenidos_count: rows[0].contenidos_count || 0,
+        views_logradas: rows[0].views_logradas || 0,
+        artista: rows[0].artista || '',
+        cancion: rows[0].cancion || '',
+        influencers: rows.sort((a, b) =>
+          (Number(b.ig_seguidores) + Number(b.tt_seguidores)) -
+          (Number(a.ig_seguidores) + Number(a.tt_seguidores))
+        ),
+      })
     } catch (e) { console.error(e); setError('error') }
     setLoading(false)
   }
@@ -168,18 +210,21 @@ export default function VistaCliente({ token }) {
   const showIG = plat === 'Ambas' || plat === 'Instagram'
   const showTT = plat === 'Ambas' || plat === 'TikTok'
   const showBoth = plat === 'Ambas'
-
-  const totalIG = camp.influencers.reduce((s, i) => s + Number(i.ig_seguidores), 0)
-  const totalTT = camp.influencers.reduce((s, i) => s + Number(i.tt_seguidores), 0)
-  const totalSeg = (showIG ? totalIG : 0) + (showTT ? totalTT : 0)
-
-  const hasVideoTT = showTT && camp.influencers.some(i => i.video_link_tt)
-  const hasVideoIG = showIG && camp.influencers.some(i => i.video_link_ig)
-  const hasBoostcode = camp.influencers.some(i => i.boostcode && i.boostcode.trim() !== '')
+  const isNanoBlast = camp.tipo === 'Nano Blast'
+  const isClipping = camp.tipo === 'Clipping'
+  const isEspecial = isNanoBlast || isClipping
 
   const hasReporteTT = showTT && camp.reporte_url_tt
   const hasReporteIG = showIG && camp.reporte_url_ig
   const hasAnyReporte = hasReporteTT || hasReporteIG
+
+  // Para estándar
+  const totalIG = camp.influencers.reduce((s, i) => s + Number(i.ig_seguidores), 0)
+  const totalTT = camp.influencers.reduce((s, i) => s + Number(i.tt_seguidores), 0)
+  const totalSeg = (showIG ? totalIG : 0) + (showTT ? totalTT : 0)
+  const hasVideoTT = showTT && camp.influencers.some(i => i.video_link_tt)
+  const hasVideoIG = showIG && camp.influencers.some(i => i.video_link_ig)
+  const hasBoostcode = camp.influencers.some(i => i.boostcode && i.boostcode.trim() !== '')
 
   const thStyle = {
     padding: '11px 16px', textAlign: 'left', fontSize: 10.5,
@@ -196,215 +241,198 @@ export default function VistaCliente({ token }) {
           <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', letterSpacing: '.05em' }}>RUIDO LAB — Influencer MKT</span>
         </div>
 
-        {/* Título + botones reporte minimalistas */}
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, marginBottom: 16 }}>
           <div>
-            <h1 style={{ fontSize: 22, fontWeight: 500, color: '#fff', marginBottom: 4 }}>{camp.nombre}</h1>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+              <h1 style={{ fontSize: 22, fontWeight: 500, color: '#fff' }}>{camp.nombre}</h1>
+              {isEspecial && (
+                <span style={{ fontSize: 11, padding: '2px 9px', borderRadius: 20, background: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.7)' }}>
+                  {camp.tipo}
+                </span>
+              )}
+            </div>
             <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)' }}>
-              Propuesta para {camp.cliente}
+              {camp.cliente}
+              {camp.artista && <span> · {camp.artista}{camp.cancion ? ` — "${camp.cancion}"` : ''}</span>}
               {plat !== 'Ambas' && <span style={{ marginLeft: 8, background: 'rgba(255,255,255,0.1)', padding: '1px 8px', borderRadius: 20, fontSize: 11 }}>{plat}</span>}
             </p>
           </div>
-
-          {/* Botones cuadrados minimalistas */}
           {hasAnyReporte && (
             <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-              {hasReporteTT && (
-                <a href={camp.reporte_url_tt} target="_blank" rel="noopener noreferrer"
-                  title="Reporte métricas TikTok"
-                  style={{
-                    width: 36, height: 36, borderRadius: 8,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    background: 'rgba(255,255,255,0.08)', border: '0.5px solid rgba(255,255,255,0.15)',
-                    color: '#fff', textDecoration: 'none', transition: 'all .15s',
-                    flexDirection: 'column', gap: 1, flexShrink: 0,
-                  }}
-                  onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.18)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.35)' }}
-                  onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.15)' }}
-                >
-                  <span style={{ fontSize: 14 }}>◈</span>
-                  <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', letterSpacing: '.04em' }}>TT</span>
-                </a>
-              )}
-              {hasReporteIG && (
-                <a href={camp.reporte_url_ig} target="_blank" rel="noopener noreferrer"
-                  title="Reporte métricas Instagram"
-                  style={{
-                    width: 36, height: 36, borderRadius: 8,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    background: 'rgba(255,255,255,0.08)', border: '0.5px solid rgba(255,255,255,0.15)',
-                    color: '#fff', textDecoration: 'none', transition: 'all .15s',
-                    flexDirection: 'column', gap: 1, flexShrink: 0,
-                  }}
-                  onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.18)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.35)' }}
-                  onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.15)' }}
-                >
-                  <span style={{ fontSize: 14 }}>◈</span>
-                  <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', letterSpacing: '.04em' }}>IG</span>
-                </a>
-              )}
+              {hasReporteTT && <ReporteBtn url={camp.reporte_url_tt} plataforma="TikTok" />}
+              {hasReporteIG && <ReporteBtn url={camp.reporte_url_ig} plataforma="Instagram" />}
             </div>
           )}
         </div>
 
-        {/* Stats */}
-        <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
-          <div>
-            <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 4 }}>Influencers</div>
-            <div style={{ fontSize: 20, fontWeight: 500, color: '#fff' }}>{camp.influencers.length}</div>
-          </div>
-          {showIG && (
+        {/* Stats en header */}
+        <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+          {isNanoBlast && (
             <div>
-              <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 4 }}>Instagram</div>
-              <div style={{ fontSize: 20, fontWeight: 500, color: '#fff' }}>{fmtSeg(totalIG)}</div>
+              <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 4 }}>Contenidos publicados</div>
+              <div style={{ fontSize: 26, fontWeight: 500, color: '#fff' }}>{fmtNum(camp.contenidos_count)}</div>
             </div>
           )}
-          {showTT && (
-            <div>
-              <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 4 }}>TikTok</div>
-              <div style={{ fontSize: 20, fontWeight: 500, color: '#fff' }}>{fmtSeg(totalTT)}</div>
-            </div>
+          {isClipping && (
+            <>
+              <div>
+                <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 4 }}>Videos publicados</div>
+                <div style={{ fontSize: 26, fontWeight: 500, color: '#fff' }}>{fmtNum(camp.contenidos_count)}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 4 }}>Views logradas</div>
+                <div style={{ fontSize: 26, fontWeight: 500, color: '#fff' }}>{fmtNum(camp.views_logradas)}</div>
+              </div>
+            </>
           )}
-          {showBoth && (
-            <div>
-              <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 4 }}>Alcance total</div>
-              <div style={{ fontSize: 20, fontWeight: 500, color: '#fff' }}>{fmtSeg(totalSeg)}</div>
-            </div>
+          {!isEspecial && (
+            <>
+              <div>
+                <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 4 }}>Influencers</div>
+                <div style={{ fontSize: 20, fontWeight: 500, color: '#fff' }}>{camp.influencers.length}</div>
+              </div>
+              {showIG && <div>
+                <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 4 }}>Instagram</div>
+                <div style={{ fontSize: 20, fontWeight: 500, color: '#fff' }}>{fmtSeg(totalIG)}</div>
+              </div>}
+              {showTT && <div>
+                <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 4 }}>TikTok</div>
+                <div style={{ fontSize: 20, fontWeight: 500, color: '#fff' }}>{fmtSeg(totalTT)}</div>
+              </div>}
+              {showBoth && <div>
+                <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 4 }}>Alcance total</div>
+                <div style={{ fontSize: 20, fontWeight: 500, color: '#fff' }}>{fmtSeg(totalSeg)}</div>
+              </div>}
+            </>
           )}
         </div>
       </div>
 
       <div style={{ padding: '28px 40px' }}>
-        {/* Tabla influencers */}
-        <div style={{ background: '#fff', border: '0.5px solid #E5E5E2', borderRadius: 12, overflow: 'hidden' }}>
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr style={{ background: '#F7F7F5', borderBottom: '0.5px solid #E5E5E2' }}>
-                  <th style={{ ...thStyle, minWidth: 180 }}>Influencer</th>
-                  {showIG && <th style={{ ...thStyle, minWidth: 150 }}>Instagram</th>}
-                  {showTT && <th style={{ ...thStyle, minWidth: 150 }}>TikTok</th>}
-                  <th style={{ ...thStyle, minWidth: 150 }}>Categorías</th>
-                  {hasVideoIG && <th style={{ ...thStyle, minWidth: 80 }}>Post IG</th>}
-                  {hasVideoTT && <th style={{ ...thStyle, minWidth: 80 }}>Video TT</th>}
-                  {hasBoostcode && <th style={{ ...thStyle, minWidth: 110 }}>Boostcode</th>}
-                </tr>
-              </thead>
-              <tbody>
-                {camp.influencers.map((inf, i) => {
-                  const tipos = inf.tipos_contenido || []
-                  const igSize = getSize(inf.ig_seguidores)
-                  const ttSize = getSize(inf.tt_seguidores)
-                  return (
-                    <tr key={i} style={{ borderBottom: i < camp.influencers.length - 1 ? '0.5px solid #F0F0EE' : 'none' }}>
-                      <td style={{ padding: '13px 16px', verticalAlign: 'middle' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                          <Avatar nombre={inf.nombre} index={i} />
-                          <span style={{ fontWeight: 500, fontSize: 13 }}>{inf.nombre}</span>
-                        </div>
-                      </td>
-                      {showIG && (
-                        <td style={{ padding: '13px 16px', verticalAlign: 'middle' }}>
-                          <ProfileLink username={inf.ig_usuario} link={inf.ig_link} />
-                          {inf.ig_seguidores > 0 && (
-                            <div style={{ fontSize: 11, color: '#AAA', marginTop: 2 }}>
-                              {fmtSeg(inf.ig_seguidores)}
-                              <span style={{ marginLeft: 4, fontSize: 10, background: '#F1EFE8', color: '#5F5E5A', padding: '0 5px', borderRadius: 10 }}>{igSize}</span>
-                            </div>
-                          )}
-                        </td>
-                      )}
-                      {showTT && (
-                        <td style={{ padding: '13px 16px', verticalAlign: 'middle' }}>
-                          <ProfileLink username={inf.tt_usuario} link={inf.tt_link} />
-                          {inf.tt_seguidores > 0 && (
-                            <div style={{ fontSize: 11, color: '#AAA', marginTop: 2 }}>
-                              {fmtSeg(inf.tt_seguidores)}
-                              <span style={{ marginLeft: 4, fontSize: 10, background: '#F1EFE8', color: '#5F5E5A', padding: '0 5px', borderRadius: 10 }}>{ttSize}</span>
-                            </div>
-                          )}
-                        </td>
-                      )}
-                      <td style={{ padding: '13px 16px', verticalAlign: 'middle' }}>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
-                          {tipos.map(t => {
-                            const c = TIPO_COLORS[t] || TIPO_COLORS['Otros']
-                            return <span key={t} style={{ background: c.bg, color: c.color, padding: '2px 8px', borderRadius: 20, fontSize: 11 }}>{t}</span>
-                          })}
-                          {tipos.length === 0 && <span style={{ color: '#CCC', fontSize: 12 }}>—</span>}
-                        </div>
-                      </td>
-                      {hasVideoIG && (
-                        <td style={{ padding: '13px 16px', verticalAlign: 'middle' }}>
-                          {inf.video_link_ig
-                            ? <a href={inf.video_link_ig} target="_blank" rel="noopener noreferrer"
-                                style={{ color: '#C2185B', fontSize: 13, textDecoration: 'none', fontWeight: 500 }}
-                                onMouseEnter={e => e.currentTarget.style.textDecoration = 'underline'}
-                                onMouseLeave={e => e.currentTarget.style.textDecoration = 'none'}
-                              >Ver ↗</a>
-                            : <span style={{ color: '#CCC', fontSize: 12 }}>—</span>
-                          }
-                        </td>
-                      )}
-                      {hasVideoTT && (
-                        <td style={{ padding: '13px 16px', verticalAlign: 'middle' }}>
-                          {inf.video_link_tt
-                            ? <a href={inf.video_link_tt} target="_blank" rel="noopener noreferrer"
-                                style={{ color: '#1A1A1A', fontSize: 13, textDecoration: 'none', fontWeight: 500 }}
-                                onMouseEnter={e => e.currentTarget.style.textDecoration = 'underline'}
-                                onMouseLeave={e => e.currentTarget.style.textDecoration = 'none'}
-                              >Ver ↗</a>
-                            : <span style={{ color: '#CCC', fontSize: 12 }}>—</span>
-                          }
-                        </td>
-                      )}
-                      {hasBoostcode && (
-                        <td style={{ padding: '13px 16px', verticalAlign: 'middle' }}>
-                          {inf.boostcode && inf.boostcode.trim()
-                            ? <span style={{ fontFamily: 'monospace', fontSize: 13, fontWeight: 600, background: '#F7F7F5', border: '0.5px solid #E5E5E2', padding: '3px 10px', borderRadius: 6, color: '#1A1A1A', letterSpacing: '.05em' }}>{inf.boostcode}</span>
-                            : <span style={{ color: '#CCC', fontSize: 12 }}>—</span>
-                          }
-                        </td>
-                      )}
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
 
-          {/* Footer totales */}
-          <div style={{ padding: '14px 16px', background: '#F7F7F5', borderTop: '0.5px solid #E5E5E2', display: 'flex', justifyContent: 'flex-end', gap: 24 }}>
-            <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: 10.5, color: '#AAA', textTransform: 'uppercase', letterSpacing: '.07em' }}>Total influencers</div>
-              <div style={{ fontSize: 16, fontWeight: 500 }}>{camp.influencers.length}</div>
+        {/* Vista especial Nano Blast / Clipping — sin tabla de influencers */}
+        {isEspecial && (
+          <div style={{ textAlign: 'center', padding: '40px 0', color: '#888', fontSize: 13 }}>
+            {hasAnyReporte
+              ? 'Usa los botones de métricas en el header para ver el reporte completo de esta campaña.'
+              : 'El reporte de métricas estará disponible próximamente.'}
+          </div>
+        )}
+
+        {/* Vista estándar — tabla influencers */}
+        {!isEspecial && (
+          <div style={{ background: '#fff', border: '0.5px solid #E5E5E2', borderRadius: 12, overflow: 'hidden' }}>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ background: '#F7F7F5', borderBottom: '0.5px solid #E5E5E2' }}>
+                    <th style={{ ...thStyle, minWidth: 180 }}>Influencer</th>
+                    {showIG && <th style={{ ...thStyle, minWidth: 150 }}>Instagram</th>}
+                    {showTT && <th style={{ ...thStyle, minWidth: 150 }}>TikTok</th>}
+                    <th style={{ ...thStyle, minWidth: 150 }}>Categorías</th>
+                    {hasVideoIG && <th style={{ ...thStyle, minWidth: 80 }}>Post IG</th>}
+                    {hasVideoTT && <th style={{ ...thStyle, minWidth: 80 }}>Video TT</th>}
+                    {hasBoostcode && <th style={{ ...thStyle, minWidth: 110 }}>Boostcode</th>}
+                  </tr>
+                </thead>
+                <tbody>
+                  {camp.influencers.map((inf, i) => {
+                    const tipos = inf.tipos_contenido || []
+                    const igSize = getSize(inf.ig_seguidores)
+                    const ttSize = getSize(inf.tt_seguidores)
+                    return (
+                      <tr key={i} style={{ borderBottom: i < camp.influencers.length - 1 ? '0.5px solid #F0F0EE' : 'none' }}>
+                        <td style={{ padding: '13px 16px', verticalAlign: 'middle' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <Avatar nombre={inf.nombre} index={i} />
+                            <span style={{ fontWeight: 500, fontSize: 13 }}>{inf.nombre}</span>
+                          </div>
+                        </td>
+                        {showIG && (
+                          <td style={{ padding: '13px 16px', verticalAlign: 'middle' }}>
+                            <ProfileLink username={inf.ig_usuario} link={inf.ig_link} />
+                            {inf.ig_seguidores > 0 && (
+                              <div style={{ fontSize: 11, color: '#AAA', marginTop: 2 }}>
+                                {fmtSeg(inf.ig_seguidores)}
+                                <span style={{ marginLeft: 4, fontSize: 10, background: '#F1EFE8', color: '#5F5E5A', padding: '0 5px', borderRadius: 10 }}>{igSize}</span>
+                              </div>
+                            )}
+                          </td>
+                        )}
+                        {showTT && (
+                          <td style={{ padding: '13px 16px', verticalAlign: 'middle' }}>
+                            <ProfileLink username={inf.tt_usuario} link={inf.tt_link} />
+                            {inf.tt_seguidores > 0 && (
+                              <div style={{ fontSize: 11, color: '#AAA', marginTop: 2 }}>
+                                {fmtSeg(inf.tt_seguidores)}
+                                <span style={{ marginLeft: 4, fontSize: 10, background: '#F1EFE8', color: '#5F5E5A', padding: '0 5px', borderRadius: 10 }}>{ttSize}</span>
+                              </div>
+                            )}
+                          </td>
+                        )}
+                        <td style={{ padding: '13px 16px', verticalAlign: 'middle' }}>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+                            {tipos.map(t => {
+                              const c = TIPO_COLORS[t] || TIPO_COLORS['Otros']
+                              return <span key={t} style={{ background: c.bg, color: c.color, padding: '2px 8px', borderRadius: 20, fontSize: 11 }}>{t}</span>
+                            })}
+                            {tipos.length === 0 && <span style={{ color: '#CCC', fontSize: 12 }}>—</span>}
+                          </div>
+                        </td>
+                        {hasVideoIG && (
+                          <td style={{ padding: '13px 16px', verticalAlign: 'middle' }}>
+                            {inf.video_link_ig
+                              ? <a href={inf.video_link_ig} target="_blank" rel="noopener noreferrer"
+                                  style={{ color: '#C2185B', fontSize: 13, textDecoration: 'none', fontWeight: 500 }}
+                                  onMouseEnter={e => e.currentTarget.style.textDecoration = 'underline'}
+                                  onMouseLeave={e => e.currentTarget.style.textDecoration = 'none'}
+                                >Ver ↗</a>
+                              : <span style={{ color: '#CCC', fontSize: 12 }}>—</span>}
+                          </td>
+                        )}
+                        {hasVideoTT && (
+                          <td style={{ padding: '13px 16px', verticalAlign: 'middle' }}>
+                            {inf.video_link_tt
+                              ? <a href={inf.video_link_tt} target="_blank" rel="noopener noreferrer"
+                                  style={{ color: '#1A1A1A', fontSize: 13, textDecoration: 'none', fontWeight: 500 }}
+                                  onMouseEnter={e => e.currentTarget.style.textDecoration = 'underline'}
+                                  onMouseLeave={e => e.currentTarget.style.textDecoration = 'none'}
+                                >Ver ↗</a>
+                              : <span style={{ color: '#CCC', fontSize: 12 }}>—</span>}
+                          </td>
+                        )}
+                        {hasBoostcode && (
+                          <td style={{ padding: '13px 16px', verticalAlign: 'middle' }}>
+                            {inf.boostcode && inf.boostcode.trim()
+                              ? <span style={{ fontFamily: 'monospace', fontSize: 13, fontWeight: 600, background: '#F7F7F5', border: '0.5px solid #E5E5E2', padding: '3px 10px', borderRadius: 6, color: '#1A1A1A', letterSpacing: '.05em' }}>{inf.boostcode}</span>
+                              : <span style={{ color: '#CCC', fontSize: 12 }}>—</span>}
+                          </td>
+                        )}
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
             </div>
-            {showIG && (
+
+            <div style={{ padding: '14px 16px', background: '#F7F7F5', borderTop: '0.5px solid #E5E5E2', display: 'flex', justifyContent: 'flex-end', gap: 24 }}>
               <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: 10.5, color: '#AAA', textTransform: 'uppercase', letterSpacing: '.07em' }}>Total influencers</div>
+                <div style={{ fontSize: 16, fontWeight: 500 }}>{camp.influencers.length}</div>
+              </div>
+              {showIG && <div style={{ textAlign: 'right' }}>
                 <div style={{ fontSize: 10.5, color: '#AAA', textTransform: 'uppercase', letterSpacing: '.07em' }}>Instagram</div>
                 <div style={{ fontSize: 16, fontWeight: 500 }}>{fmtSeg(totalIG)}</div>
-              </div>
-            )}
-            {showTT && (
-              <div style={{ textAlign: 'right' }}>
+              </div>}
+              {showTT && <div style={{ textAlign: 'right' }}>
                 <div style={{ fontSize: 10.5, color: '#AAA', textTransform: 'uppercase', letterSpacing: '.07em' }}>TikTok</div>
                 <div style={{ fontSize: 16, fontWeight: 500 }}>{fmtSeg(totalTT)}</div>
-              </div>
-            )}
-            {showBoth && (
-              <div style={{ textAlign: 'right' }}>
+              </div>}
+              {showBoth && <div style={{ textAlign: 'right' }}>
                 <div style={{ fontSize: 10.5, color: '#AAA', textTransform: 'uppercase', letterSpacing: '.07em' }}>Alcance total</div>
                 <div style={{ fontSize: 16, fontWeight: 500 }}>{fmtSeg(totalSeg)}</div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Tarjetas reporte al fondo */}
-        {hasAnyReporte && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 20 }}>
-            {hasReporteTT && <ReporteCard url={camp.reporte_url_tt} plataforma="TikTok" />}
-            {hasReporteIG && <ReporteCard url={camp.reporte_url_ig} plataforma="Instagram" />}
+              </div>}
+            </div>
           </div>
         )}
 
