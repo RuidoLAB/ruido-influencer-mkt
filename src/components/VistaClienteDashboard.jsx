@@ -59,6 +59,17 @@ function fmtNum(n) {
   return n.toLocaleString('es-CL')
 }
 
+// Hook simple para detectar mobile
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 720 : false)
+  useEffect(() => {
+    function onResize() { setIsMobile(window.innerWidth < 720) }
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+  return isMobile
+}
+
 function Avatar({ nombre, index, size = 32 }) {
   const c = AV_COLORS[index % AV_COLORS.length]
   return (
@@ -77,25 +88,22 @@ function ProfileLink({ username, link }) {
   if (link) return (
     <a href={link} target="_blank" rel="noopener noreferrer"
       style={{ color: '#E8313A', fontWeight: 500, textDecoration: 'none', fontSize: 13 }}
-      onMouseEnter={e => e.currentTarget.style.textDecoration = 'underline'}
-      onMouseLeave={e => e.currentTarget.style.textDecoration = 'none'}
     >{username} <span style={{ fontSize: 10, opacity: 0.6 }}>↗</span></a>
   )
   return <span style={{ fontSize: 13, color: '#555', fontWeight: 500 }}>{username}</span>
 }
 
-function ReporteBtn({ url, plataforma }) {
+function ReporteBtn({ url, plataforma, isMobile }) {
   const isTT = plataforma === 'TikTok'
   return (
     <a href={url} target="_blank" rel="noopener noreferrer"
       style={{
         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-        gap: 2, padding: '6px 12px', borderRadius: 8, minWidth: 70,
+        gap: 2, padding: isMobile ? '8px 12px' : '6px 12px', borderRadius: 8,
+        minWidth: isMobile ? 64 : 70, minHeight: isMobile ? 44 : 'auto',
         background: 'rgba(255,255,255,0.08)', border: '0.5px solid rgba(255,255,255,0.15)',
         color: '#fff', textDecoration: 'none', transition: 'all .15s', flexShrink: 0,
       }}
-      onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.18)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.35)' }}
-      onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.15)' }}
     >
       <span style={{ fontSize: 14 }}>◈</span>
       <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.7)', letterSpacing: '.03em' }}>
@@ -106,6 +114,7 @@ function ReporteBtn({ url, plataforma }) {
 }
 
 export default function VistaClienteDashboard({ token }) {
+  const isMobile = useIsMobile()
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -114,6 +123,7 @@ export default function VistaClienteDashboard({ token }) {
   const [filterEstado, setFilterEstado] = useState('')
   const [filterAnio, setFilterAnio] = useState('')
   const [sortOrder, setSortOrder] = useState('reciente')
+  const [filtersOpen, setFiltersOpen] = useState(false)
 
   useEffect(() => { if (token) fetchData(token) }, [token])
 
@@ -141,6 +151,7 @@ export default function VistaClienteDashboard({ token }) {
           c.fecha_inicio, c.fecha_termino, c.plataforma,
           c.reporte_url_tt, c.reporte_url_ig,
           c.tipo, c.contenidos_count, c.views_logradas,
+          c.created_at,
           COUNT(DISTINCT ci.id) AS total_influencers,
           COUNT(DISTINCT CASE WHEN ci.video_link_tt != '' OR ci.video_link_ig != '' THEN ci.id END) AS videos_publicados
         FROM campaigns c
@@ -183,7 +194,7 @@ export default function VistaClienteDashboard({ token }) {
   )
 
   if (error) return (
-    <div style={{ minHeight: '100vh', background: '#F7F7F5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+    <div style={{ minHeight: '100vh', background: '#F7F7F5', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
       <div style={{ textAlign: 'center', color: '#AAA' }}>
         <div style={{ fontSize: 32, marginBottom: 12 }}>◈</div>
         <div style={{ fontSize: 15, fontWeight: 500, color: '#555', marginBottom: 6 }}>
@@ -196,6 +207,7 @@ export default function VistaClienteDashboard({ token }) {
 
   const { client, camps } = data
   const brandColor = client.color || '#E8313A'
+  const padX = isMobile ? 16 : 40
 
   // ─── VISTA CAMPAÑA INDIVIDUAL ───
   if (selectedCamp) {
@@ -218,113 +230,115 @@ export default function VistaClienteDashboard({ token }) {
     const hasAnyReporte = hasReporteTT || hasReporteIG
 
     const thStyle = {
-      padding: '11px 16px', textAlign: 'left', fontSize: 10.5,
+      padding: isMobile ? '10px 12px' : '11px 16px', textAlign: 'left', fontSize: 10.5,
       fontWeight: 500, textTransform: 'uppercase', letterSpacing: '.08em', color: '#AAA',
+      whiteSpace: 'nowrap',
     }
+    const tdPad = isMobile ? '11px 12px' : '13px 16px'
 
     return (
       <div style={{ minHeight: '100vh', background: '#F7F7F5', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
-        <div style={{ background: '#111', padding: '24px 40px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-            <div style={{ width: 26, height: 26, background: brandColor, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: '#fff' }}>
+        <div style={{ background: '#111', padding: isMobile ? '18px 16px' : '24px 40px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
+            <div style={{ width: 24, height: 24, background: brandColor, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, color: '#fff', flexShrink: 0 }}>
               {client.client_nombre?.slice(0, 2).toUpperCase()}
             </div>
-            <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)' }}>{client.client_nombre}</span>
-            <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.3)' }}>·</span>
-            <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', cursor: 'pointer' }} onClick={() => setSelectedCamp(null)}>← Volver</span>
+            <span style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.5)' }}>{client.client_nombre}</span>
+            <span
+              style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.6)', cursor: 'pointer', marginLeft: 'auto', padding: '4px 0' }}
+              onClick={() => setSelectedCamp(null)}
+            >← Volver</span>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, marginBottom: 16 }}>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                <h1 style={{ fontSize: 20, fontWeight: 500, color: '#fff' }}>{selectedCamp.nombre}</h1>
-                {isEspecial && (
-                  <span style={{ fontSize: 11, padding: '2px 9px', borderRadius: 20, background: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.7)' }}>
-                    {selectedCamp.tipo}
-                  </span>
-                )}
-              </div>
-              {selectedCamp.artista && (
-                <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)' }}>
-                  {selectedCamp.artista}{selectedCamp.cancion ? ` — "${selectedCamp.cancion}"` : ''}
-                </p>
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
+              <h1 style={{ fontSize: isMobile ? 17 : 20, fontWeight: 500, color: '#fff' }}>{selectedCamp.nombre}</h1>
+              {isEspecial && (
+                <span style={{ fontSize: 10.5, padding: '2px 8px', borderRadius: 20, background: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.7)' }}>
+                  {selectedCamp.tipo}
+                </span>
               )}
             </div>
-            {hasAnyReporte && (
-              <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-                {hasReporteTT && <ReporteBtn url={selectedCamp.reporte_url_tt} plataforma="TikTok" />}
-                {hasReporteIG && <ReporteBtn url={selectedCamp.reporte_url_ig} plataforma="Instagram" />}
-              </div>
+            {selectedCamp.artista && (
+              <p style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.5)' }}>
+                {selectedCamp.artista}{selectedCamp.cancion ? ` — "${selectedCamp.cancion}"` : ''}
+              </p>
             )}
           </div>
 
+          {/* Botones reporte */}
+          {hasAnyReporte && (
+            <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+              {hasReporteTT && <ReporteBtn url={selectedCamp.reporte_url_tt} plataforma="TikTok" isMobile={isMobile} />}
+              {hasReporteIG && <ReporteBtn url={selectedCamp.reporte_url_ig} plataforma="Instagram" isMobile={isMobile} />}
+            </div>
+          )}
+
           {/* Stats */}
-          <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, auto)', gap: isMobile ? 12 : 20 }}>
             {isNanoBlast && (
               <div>
-                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 3 }}>Contenidos publicados</div>
-                <div style={{ fontSize: 22, fontWeight: 500, color: '#fff' }}>{fmtNum(selectedCamp.contenidos_count)}</div>
+                <div style={{ fontSize: 9.5, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 3 }}>Contenidos publicados</div>
+                <div style={{ fontSize: isMobile ? 18 : 22, fontWeight: 500, color: '#fff' }}>{fmtNum(selectedCamp.contenidos_count)}</div>
               </div>
             )}
             {isClipping && (
               <>
                 <div>
-                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 3 }}>Videos publicados</div>
-                  <div style={{ fontSize: 22, fontWeight: 500, color: '#fff' }}>{fmtNum(selectedCamp.contenidos_count)}</div>
+                  <div style={{ fontSize: 9.5, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 3 }}>Videos publicados</div>
+                  <div style={{ fontSize: isMobile ? 18 : 22, fontWeight: 500, color: '#fff' }}>{fmtNum(selectedCamp.contenidos_count)}</div>
                 </div>
                 <div>
-                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 3 }}>Views logradas</div>
-                  <div style={{ fontSize: 22, fontWeight: 500, color: '#fff' }}>{fmtNum(selectedCamp.views_logradas)}</div>
+                  <div style={{ fontSize: 9.5, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 3 }}>Views logradas</div>
+                  <div style={{ fontSize: isMobile ? 18 : 22, fontWeight: 500, color: '#fff' }}>{fmtNum(selectedCamp.views_logradas)}</div>
                 </div>
               </>
             )}
             {!isEspecial && (
               <>
                 <div>
-                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 3 }}>Influencers</div>
-                  <div style={{ fontSize: 18, fontWeight: 500, color: '#fff' }}>{selectedCamp.influencers.length}</div>
+                  <div style={{ fontSize: 9.5, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 3 }}>Influencers</div>
+                  <div style={{ fontSize: isMobile ? 16 : 18, fontWeight: 500, color: '#fff' }}>{selectedCamp.influencers.length}</div>
                 </div>
                 {showIG && <div>
-                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 3 }}>Instagram</div>
-                  <div style={{ fontSize: 18, fontWeight: 500, color: '#fff' }}>{fmtSeg(totalIG)}</div>
+                  <div style={{ fontSize: 9.5, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 3 }}>Instagram</div>
+                  <div style={{ fontSize: isMobile ? 16 : 18, fontWeight: 500, color: '#fff' }}>{fmtSeg(totalIG)}</div>
                 </div>}
                 {showTT && <div>
-                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 3 }}>TikTok</div>
-                  <div style={{ fontSize: 18, fontWeight: 500, color: '#fff' }}>{fmtSeg(totalTT)}</div>
+                  <div style={{ fontSize: 9.5, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 3 }}>TikTok</div>
+                  <div style={{ fontSize: isMobile ? 16 : 18, fontWeight: 500, color: '#fff' }}>{fmtSeg(totalTT)}</div>
                 </div>}
                 {showBoth && <div>
-                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 3 }}>Alcance total</div>
-                  <div style={{ fontSize: 18, fontWeight: 500, color: '#fff' }}>{fmtSeg(totalSeg)}</div>
+                  <div style={{ fontSize: 9.5, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 3 }}>Alcance total</div>
+                  <div style={{ fontSize: isMobile ? 16 : 18, fontWeight: 500, color: '#fff' }}>{fmtSeg(totalSeg)}</div>
                 </div>}
               </>
             )}
           </div>
         </div>
 
-        <div style={{ padding: '24px 40px' }}>
-          {/* Vista especial — sin tabla */}
+        <div style={{ padding: isMobile ? '20px 16px' : '24px 40px' }}>
           {isEspecial && (
-            <div style={{ textAlign: 'center', padding: '48px 0', color: '#888', fontSize: 13 }}>
+            <div style={{ textAlign: 'center', padding: isMobile ? '32px 16px' : '48px 0', color: '#888', fontSize: 13 }}>
               {hasAnyReporte
-                ? 'Usa los botones de métricas en el header para ver el reporte completo.'
+                ? 'Usa los botones de métricas arriba para ver el reporte completo.'
                 : 'El reporte de métricas estará disponible próximamente.'}
             </div>
           )}
 
-          {/* Vista estándar — tabla influencers */}
           {!isEspecial && (
             <div style={{ background: '#fff', border: '0.5px solid #E5E5E2', borderRadius: 12, overflow: 'hidden' }}>
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: isMobile ? 560 : 'auto' }}>
                   <thead>
                     <tr style={{ background: '#F7F7F5', borderBottom: '0.5px solid #E5E5E2' }}>
-                      <th style={{ ...thStyle, minWidth: 180 }}>Influencer</th>
-                      {showIG && <th style={{ ...thStyle, minWidth: 150 }}>Instagram</th>}
-                      {showTT && <th style={{ ...thStyle, minWidth: 150 }}>TikTok</th>}
-                      <th style={{ ...thStyle, minWidth: 140 }}>Categorías</th>
-                      {hasVideoIG && <th style={{ ...thStyle, minWidth: 90 }}>Post IG</th>}
-                      {hasVideoTT && <th style={{ ...thStyle, minWidth: 90 }}>Video TT</th>}
-                      {hasBoostcode && <th style={{ ...thStyle, minWidth: 110 }}>Boostcode</th>}
+                      <th style={{ ...thStyle, minWidth: 150 }}>Influencer</th>
+                      {showIG && <th style={{ ...thStyle, minWidth: 130 }}>Instagram</th>}
+                      {showTT && <th style={{ ...thStyle, minWidth: 130 }}>TikTok</th>}
+                      <th style={{ ...thStyle, minWidth: 120 }}>Categorías</th>
+                      {hasVideoIG && <th style={{ ...thStyle, minWidth: 80 }}>Post IG</th>}
+                      {hasVideoTT && <th style={{ ...thStyle, minWidth: 80 }}>Video TT</th>}
+                      {hasBoostcode && <th style={{ ...thStyle, minWidth: 100 }}>Boostcode</th>}
                     </tr>
                   </thead>
                   <tbody>
@@ -334,14 +348,14 @@ export default function VistaClienteDashboard({ token }) {
                       const ttSize = getSize(inf.tt_seguidores)
                       return (
                         <tr key={i} style={{ borderBottom: i < selectedCamp.influencers.length - 1 ? '0.5px solid #F0F0EE' : 'none' }}>
-                          <td style={{ padding: '13px 16px', verticalAlign: 'middle' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                              <Avatar nombre={inf.nombre} index={i} />
+                          <td style={{ padding: tdPad, verticalAlign: 'middle' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+                              <Avatar nombre={inf.nombre} index={i} size={isMobile ? 28 : 32} />
                               <span style={{ fontWeight: 500, fontSize: 13 }}>{inf.nombre}</span>
                             </div>
                           </td>
                           {showIG && (
-                            <td style={{ padding: '13px 16px', verticalAlign: 'middle' }}>
+                            <td style={{ padding: tdPad, verticalAlign: 'middle' }}>
                               <ProfileLink username={inf.ig_usuario} link={inf.ig_link} />
                               {inf.ig_seguidores > 0 && (
                                 <div style={{ fontSize: 11, color: '#AAA', marginTop: 2 }}>
@@ -352,7 +366,7 @@ export default function VistaClienteDashboard({ token }) {
                             </td>
                           )}
                           {showTT && (
-                            <td style={{ padding: '13px 16px', verticalAlign: 'middle' }}>
+                            <td style={{ padding: tdPad, verticalAlign: 'middle' }}>
                               <ProfileLink username={inf.tt_usuario} link={inf.tt_link} />
                               {inf.tt_seguidores > 0 && (
                                 <div style={{ fontSize: 11, color: '#AAA', marginTop: 2 }}>
@@ -362,7 +376,7 @@ export default function VistaClienteDashboard({ token }) {
                               )}
                             </td>
                           )}
-                          <td style={{ padding: '13px 16px', verticalAlign: 'middle' }}>
+                          <td style={{ padding: tdPad, verticalAlign: 'middle' }}>
                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
                               {tipos.map(t => {
                                 const c = TIPO_COLORS[t] || TIPO_COLORS['Otros']
@@ -372,31 +386,23 @@ export default function VistaClienteDashboard({ token }) {
                             </div>
                           </td>
                           {hasVideoIG && (
-                            <td style={{ padding: '13px 16px', verticalAlign: 'middle' }}>
+                            <td style={{ padding: tdPad, verticalAlign: 'middle' }}>
                               {inf.video_link_ig
-                                ? <a href={inf.video_link_ig} target="_blank" rel="noopener noreferrer"
-                                    style={{ color: '#C2185B', fontSize: 13, textDecoration: 'none', fontWeight: 500 }}
-                                    onMouseEnter={e => e.currentTarget.style.textDecoration = 'underline'}
-                                    onMouseLeave={e => e.currentTarget.style.textDecoration = 'none'}
-                                  >Ver ↗</a>
+                                ? <a href={inf.video_link_ig} target="_blank" rel="noopener noreferrer" style={{ color: '#C2185B', fontSize: 13, textDecoration: 'none', fontWeight: 500 }}>Ver ↗</a>
                                 : <span style={{ color: '#CCC', fontSize: 12 }}>—</span>}
                             </td>
                           )}
                           {hasVideoTT && (
-                            <td style={{ padding: '13px 16px', verticalAlign: 'middle' }}>
+                            <td style={{ padding: tdPad, verticalAlign: 'middle' }}>
                               {inf.video_link_tt
-                                ? <a href={inf.video_link_tt} target="_blank" rel="noopener noreferrer"
-                                    style={{ color: '#1A1A1A', fontSize: 13, textDecoration: 'none', fontWeight: 500 }}
-                                    onMouseEnter={e => e.currentTarget.style.textDecoration = 'underline'}
-                                    onMouseLeave={e => e.currentTarget.style.textDecoration = 'none'}
-                                  >Ver ↗</a>
+                                ? <a href={inf.video_link_tt} target="_blank" rel="noopener noreferrer" style={{ color: '#1A1A1A', fontSize: 13, textDecoration: 'none', fontWeight: 500 }}>Ver ↗</a>
                                 : <span style={{ color: '#CCC', fontSize: 12 }}>—</span>}
                             </td>
                           )}
                           {hasBoostcode && (
-                            <td style={{ padding: '13px 16px', verticalAlign: 'middle' }}>
+                            <td style={{ padding: tdPad, verticalAlign: 'middle' }}>
                               {inf.boostcode && inf.boostcode.trim()
-                                ? <span style={{ fontFamily: 'monospace', fontSize: 13, fontWeight: 600, background: '#F7F7F5', border: '0.5px solid #E5E5E2', padding: '3px 10px', borderRadius: 6, color: '#1A1A1A', letterSpacing: '.05em' }}>{inf.boostcode}</span>
+                                ? <span style={{ fontFamily: 'monospace', fontSize: 12.5, fontWeight: 600, background: '#F7F7F5', border: '0.5px solid #E5E5E2', padding: '3px 9px', borderRadius: 6, color: '#1A1A1A' }}>{inf.boostcode}</span>
                                 : <span style={{ color: '#CCC', fontSize: 12 }}>—</span>}
                             </td>
                           )}
@@ -406,22 +412,23 @@ export default function VistaClienteDashboard({ token }) {
                   </tbody>
                 </table>
               </div>
-              <div style={{ padding: '14px 16px', background: '#F7F7F5', borderTop: '0.5px solid #E5E5E2', display: 'flex', justifyContent: 'flex-end', gap: 24 }}>
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: 10.5, color: '#AAA', textTransform: 'uppercase', letterSpacing: '.07em' }}>Total influencers</div>
-                  <div style={{ fontSize: 16, fontWeight: 500 }}>{selectedCamp.influencers.length}</div>
+              {isMobile && (
+                <div style={{ padding: '6px 12px', fontSize: 10.5, color: '#BBB', textAlign: 'center', borderTop: '0.5px solid #F0F0EE' }}>
+                  ← desliza para ver más →
                 </div>
-                {showIG && <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: 10.5, color: '#AAA', textTransform: 'uppercase', letterSpacing: '.07em' }}>Instagram</div>
-                  <div style={{ fontSize: 16, fontWeight: 500 }}>{fmtSeg(totalIG)}</div>
+              )}
+              <div style={{ padding: isMobile ? '12px' : '14px 16px', background: '#F7F7F5', borderTop: '0.5px solid #E5E5E2', display: 'flex', justifyContent: isMobile ? 'space-between' : 'flex-end', gap: isMobile ? 12 : 24, flexWrap: 'wrap' }}>
+                <div style={{ textAlign: isMobile ? 'left' : 'right' }}>
+                  <div style={{ fontSize: 10, color: '#AAA', textTransform: 'uppercase', letterSpacing: '.06em' }}>Total</div>
+                  <div style={{ fontSize: 15, fontWeight: 500 }}>{selectedCamp.influencers.length}</div>
+                </div>
+                {showIG && <div style={{ textAlign: isMobile ? 'left' : 'right' }}>
+                  <div style={{ fontSize: 10, color: '#AAA', textTransform: 'uppercase', letterSpacing: '.06em' }}>Instagram</div>
+                  <div style={{ fontSize: 15, fontWeight: 500 }}>{fmtSeg(totalIG)}</div>
                 </div>}
-                {showTT && <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: 10.5, color: '#AAA', textTransform: 'uppercase', letterSpacing: '.07em' }}>TikTok</div>
-                  <div style={{ fontSize: 16, fontWeight: 500 }}>{fmtSeg(totalTT)}</div>
-                </div>}
-                {showBoth && <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: 10.5, color: '#AAA', textTransform: 'uppercase', letterSpacing: '.07em' }}>Alcance total</div>
-                  <div style={{ fontSize: 16, fontWeight: 500 }}>{fmtSeg(totalSeg)}</div>
+                {showTT && <div style={{ textAlign: isMobile ? 'left' : 'right' }}>
+                  <div style={{ fontSize: 10, color: '#AAA', textTransform: 'uppercase', letterSpacing: '.06em' }}>TikTok</div>
+                  <div style={{ fontSize: 15, fontWeight: 500 }}>{fmtSeg(totalTT)}</div>
                 </div>}
               </div>
             </div>
@@ -458,56 +465,118 @@ export default function VistaClienteDashboard({ token }) {
       : new Date(a.created_at) - new Date(b.created_at)
     )
 
+  const activeFiltersCount = [filterEstado, filterAnio].filter(Boolean).length
+
+  const kpiList = [
+    { label: 'Total campañas', value: totalCamps },
+    { label: 'Activas', value: activas },
+    { label: 'Finalizadas', value: cerradas },
+    { label: 'Influencers', value: totalInfluencers },
+    { label: 'Videos', value: totalVideos },
+  ]
+
   return (
     <div style={{ minHeight: '100vh', background: '#F7F7F5', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
-      <div style={{ background: '#111', padding: '32px 40px 28px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
-          <div style={{ width: 44, height: 44, borderRadius: 12, background: brandColor, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 700, color: '#fff' }}>
+      <div style={{ background: '#111', padding: isMobile ? '20px 16px 22px' : '32px 40px 28px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: isMobile ? 16 : 20 }}>
+          <div style={{ width: isMobile ? 38 : 44, height: isMobile ? 38 : 44, borderRadius: 12, background: brandColor, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: isMobile ? 14 : 16, fontWeight: 700, color: '#fff', flexShrink: 0 }}>
             {client.client_nombre?.slice(0, 2).toUpperCase()}
           </div>
-          <div>
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: 2 }}>Portal de campañas</div>
-            <h1 style={{ fontSize: 22, fontWeight: 500, color: '#fff' }}>{client.client_nombre}</h1>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.4)', letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: 2 }}>Portal de campañas</div>
+            <h1 style={{ fontSize: isMobile ? 18 : 22, fontWeight: 500, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{client.client_nombre}</h1>
           </div>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, auto)', gap: 32, width: 'fit-content' }}>
-          {[
-            { label: 'Total campañas', value: totalCamps },
-            { label: 'Activas', value: activas },
-            { label: 'Finalizadas', value: cerradas },
-            { label: 'Influencers', value: totalInfluencers },
-            { label: 'Videos', value: totalVideos },
-          ].map(({ label, value }) => (
+
+        {/* KPIs — grid 2 cols en mobile, fila en desktop */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: isMobile ? 'repeat(3, 1fr)' : 'repeat(5, auto)',
+          gap: isMobile ? '14px 8px' : 32,
+          width: isMobile ? '100%' : 'fit-content',
+        }}>
+          {kpiList.map(({ label, value }) => (
             <div key={label}>
-              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 4 }}>{label}</div>
-              <div style={{ fontSize: 22, fontWeight: 500, color: '#fff' }}>{value}</div>
+              <div style={{ fontSize: isMobile ? 9 : 10, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 3, lineHeight: 1.3 }}>{label}</div>
+              <div style={{ fontSize: isMobile ? 18 : 22, fontWeight: 500, color: '#fff' }}>{value}</div>
             </div>
           ))}
         </div>
       </div>
 
-      <div style={{ padding: '28px 40px' }}>
-        <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
-          <input className="input" placeholder="Buscar campaña, artista..."
-            value={search} onChange={e => setSearch(e.target.value)}
-            style={{ flex: 1, maxWidth: 280 }} />
-          <select className="input" value={filterEstado} onChange={e => setFilterEstado(e.target.value)}>
-            <option value="">Todos los estados</option>
-            <option>Activa</option><option>Pausada</option>
-            <option>Cerrada</option><option>Cancelada</option>
-          </select>
-          {anios.length > 1 && (
-            <select className="input" value={filterAnio} onChange={e => setFilterAnio(e.target.value)}>
-              <option value="">Todos los años</option>
-              {anios.map(a => <option key={a}>{a}</option>)}
-            </select>
-          )}
-          <select className="input" value={sortOrder} onChange={e => setSortOrder(e.target.value)}>
-            <option value="reciente">Más reciente</option>
-            <option value="antigua">Más antigua</option>
-          </select>
-        </div>
+      <div style={{ padding: isMobile ? '18px 16px' : '28px 40px' }}>
 
+        {/* Filtros */}
+        {isMobile ? (
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input className="input" placeholder="Buscar campaña, artista..."
+                value={search} onChange={e => setSearch(e.target.value)}
+                style={{ flex: 1, minHeight: 42, fontSize: 14 }} />
+              <button
+                onClick={() => setFiltersOpen(o => !o)}
+                style={{
+                  minHeight: 42, minWidth: 42, borderRadius: 8,
+                  border: '0.5px solid #E5E5E2', background: activeFiltersCount > 0 ? '#FCEBEB' : '#fff',
+                  color: activeFiltersCount > 0 ? '#A32D2D' : '#555',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 16, position: 'relative', flexShrink: 0,
+                }}
+              >
+                ⚙
+                {activeFiltersCount > 0 && (
+                  <span style={{
+                    position: 'absolute', top: -4, right: -4, width: 16, height: 16,
+                    borderRadius: '50%', background: '#E8313A', color: '#fff',
+                    fontSize: 9, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>{activeFiltersCount}</span>
+                )}
+              </button>
+            </div>
+            {filtersOpen && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8, background: '#fff', border: '0.5px solid #E5E5E2', borderRadius: 10, padding: 12 }}>
+                <select className="input" value={filterEstado} onChange={e => setFilterEstado(e.target.value)} style={{ minHeight: 42 }}>
+                  <option value="">Todos los estados</option>
+                  <option>Activa</option><option>Pausada</option>
+                  <option>Cerrada</option><option>Cancelada</option>
+                </select>
+                {anios.length > 1 && (
+                  <select className="input" value={filterAnio} onChange={e => setFilterAnio(e.target.value)} style={{ minHeight: 42 }}>
+                    <option value="">Todos los años</option>
+                    {anios.map(a => <option key={a}>{a}</option>)}
+                  </select>
+                )}
+                <select className="input" value={sortOrder} onChange={e => setSortOrder(e.target.value)} style={{ minHeight: 42 }}>
+                  <option value="reciente">Más reciente</option>
+                  <option value="antigua">Más antigua</option>
+                </select>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
+            <input className="input" placeholder="Buscar campaña, artista..."
+              value={search} onChange={e => setSearch(e.target.value)}
+              style={{ flex: 1, maxWidth: 280 }} />
+            <select className="input" value={filterEstado} onChange={e => setFilterEstado(e.target.value)}>
+              <option value="">Todos los estados</option>
+              <option>Activa</option><option>Pausada</option>
+              <option>Cerrada</option><option>Cancelada</option>
+            </select>
+            {anios.length > 1 && (
+              <select className="input" value={filterAnio} onChange={e => setFilterAnio(e.target.value)}>
+                <option value="">Todos los años</option>
+                {anios.map(a => <option key={a}>{a}</option>)}
+              </select>
+            )}
+            <select className="input" value={sortOrder} onChange={e => setSortOrder(e.target.value)}>
+              <option value="reciente">Más reciente</option>
+              <option value="antigua">Más antigua</option>
+            </select>
+          </div>
+        )}
+
+        {/* Lista campañas */}
         {filtered.length === 0 ? (
           <div style={{ padding: 40, textAlign: 'center', color: '#AAA', fontSize: 13 }}>Sin resultados</div>
         ) : (
@@ -518,6 +587,92 @@ export default function VistaClienteDashboard({ token }) {
               const hasTT = (plat === 'Ambas' || plat === 'TikTok') && camp.reporte_url_tt
               const hasIG = (plat === 'Ambas' || plat === 'Instagram') && camp.reporte_url_ig
               const isEspecialCamp = camp.tipo === 'Nano Blast' || camp.tipo === 'Clipping'
+
+              // ─── Tarjeta mobile: layout vertical ───
+              if (isMobile) {
+                return (
+                  <div key={camp.id}
+                    onClick={() => openCamp(camp)}
+                    style={{
+                      background: '#fff', border: '0.5px solid #E5E5E2', borderRadius: 12,
+                      padding: '14px 14px 12px', cursor: 'pointer',
+                      borderLeft: `3px solid ${brandColor}`,
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 6 }}>
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <div style={{ fontSize: 14.5, fontWeight: 500, marginBottom: 3, lineHeight: 1.3 }}>{camp.nombre}</div>
+                        <div style={{ fontSize: 11.5, color: '#AAA' }}>
+                          {camp.artista ? <>{camp.artista}{camp.cancion ? ` — "${camp.cancion}"` : ''}</> : 'Sin artista asignado'}
+                        </div>
+                      </div>
+                      <span style={{ fontSize: 18, color: '#CCC', flexShrink: 0 }}>›</span>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginBottom: 10 }}>
+                      <span style={{ background: ec.bg, color: ec.color, padding: '2px 8px', borderRadius: 20, fontSize: 10.5 }}>{camp.estado}</span>
+                      {isEspecialCamp && (
+                        <span style={{ fontSize: 10, background: '#1A1A1A', color: '#fff', padding: '2px 8px', borderRadius: 20 }}>{camp.tipo}</span>
+                      )}
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+                      <div style={{ display: 'flex', gap: 16 }}>
+                        {isEspecialCamp ? (
+                          <>
+                            <div>
+                              <div style={{ fontSize: 15, fontWeight: 500 }}>{fmtNum(camp.contenidos_count)}</div>
+                              <div style={{ fontSize: 9.5, color: '#AAA', textTransform: 'uppercase' }}>
+                                {camp.tipo === 'Clipping' ? 'Videos' : 'Contenidos'}
+                              </div>
+                            </div>
+                            {camp.tipo === 'Clipping' && (
+                              <div>
+                                <div style={{ fontSize: 15, fontWeight: 500 }}>{fmtNum(camp.views_logradas)}</div>
+                                <div style={{ fontSize: 9.5, color: '#AAA', textTransform: 'uppercase' }}>Views</div>
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          <>
+                            <div>
+                              <div style={{ fontSize: 15, fontWeight: 500 }}>{camp.total_influencers}</div>
+                              <div style={{ fontSize: 9.5, color: '#AAA', textTransform: 'uppercase' }}>Influs</div>
+                            </div>
+                            <div>
+                              <div style={{ fontSize: 15, fontWeight: 500 }}>{camp.videos_publicados}</div>
+                              <div style={{ fontSize: 9.5, color: '#AAA', textTransform: 'uppercase' }}>Videos</div>
+                            </div>
+                          </>
+                        )}
+                      </div>
+
+                      {(hasTT || hasIG) && (
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          {hasTT && (
+                            <a href={camp.reporte_url_tt} target="_blank" rel="noopener noreferrer"
+                              onClick={e => e.stopPropagation()}
+                              style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '7px 11px', minHeight: 36, borderRadius: 8, background: '#F7F7F5', border: '0.5px solid #E5E5E2', color: '#555', textDecoration: 'none', fontSize: 10.5 }}
+                            >
+                              <span style={{ fontSize: 12 }}>◈</span> TT
+                            </a>
+                          )}
+                          {hasIG && (
+                            <a href={camp.reporte_url_ig} target="_blank" rel="noopener noreferrer"
+                              onClick={e => e.stopPropagation()}
+                              style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '7px 11px', minHeight: 36, borderRadius: 8, background: '#F7F7F5', border: '0.5px solid #E5E5E2', color: '#555', textDecoration: 'none', fontSize: 10.5 }}
+                            >
+                              <span style={{ fontSize: 12 }}>◈</span> IG
+                            </a>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )
+              }
+
+              // ─── Tarjeta desktop: layout horizontal (igual a versión anterior) ───
               return (
                 <div key={camp.id}
                   style={{
@@ -614,7 +769,7 @@ export default function VistaClienteDashboard({ token }) {
           </div>
         )}
 
-        <div style={{ marginTop: 32, textAlign: 'center', fontSize: 11, color: '#CCC' }}>
+        <div style={{ marginTop: 28, textAlign: 'center', fontSize: 11, color: '#CCC' }}>
           Portal generado por RUIDO LAB — Influencer MKT
         </div>
       </div>
