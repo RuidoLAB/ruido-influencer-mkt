@@ -6,7 +6,7 @@ import Reportes from './Reportes'
 import Pagos from './Pagos'
 
 const TIPOS_CONTENIDO = ['Bailes', 'Reviewers', 'Humor', 'Lifestyle', 'Música', 'Gaming', 'Moda', 'Fitness', 'Viajes', 'Otros']
-const TIPOS_CAMPANA = ['Estándar', 'Nano Blast', 'Clipping']
+const TIPOS_CAMPANA = ['Estándar', 'Nano Blast', 'Clipping', 'Playlisting']
 
 const TIPO_COLORS = {
   Bailes:    { bg: '#EEEDFE', color: '#3C3489' },
@@ -182,25 +182,25 @@ const EMPTY_CAMP = {
 }
 const EMPTY_CI_EDIT = { costo: '', piezas: '1', estado: 'Contactado', notas: '', video_link_tt: '', video_link_ig: '', boostcode: '' }
 
-// ─── FORM FIELDS — definido FUERA del componente para evitar re-mount en cada render ───
+// ─── FORM FIELDS — definido FUERA del componente para evitar re-mount ───
 function CampFormFields({ form, setForm, error, clientsList }) {
   const fPlat = form.plataforma
   const fShowTT = fPlat === 'Ambas' || fPlat === 'TikTok'
   const fShowIG = fPlat === 'Ambas' || fPlat === 'Instagram'
   const isNanoBlast = form.tipo === 'Nano Blast'
   const isClipping = form.tipo === 'Clipping'
-  const isEspecial = isNanoBlast || isClipping
+  const isPlaylisting = form.tipo === 'Playlisting'
 
   return (
     <>
       <div className="fg">
         <label className="label">Tipo de campaña</label>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           {TIPOS_CAMPANA.map(t => (
             <div key={t} onClick={() => setForm(f => ({ ...f, tipo: t }))}
               style={{
-                flex: 1, padding: '8px 12px', borderRadius: 8, cursor: 'pointer',
-                textAlign: 'center', fontSize: 12.5, userSelect: 'none', transition: 'all .12s',
+                flex: '1 1 auto', padding: '8px 10px', borderRadius: 8, cursor: 'pointer',
+                textAlign: 'center', fontSize: 12, userSelect: 'none', transition: 'all .12s',
                 background: form.tipo === t ? '#1A1A1A' : '#F7F7F5',
                 color: form.tipo === t ? '#fff' : '#888',
                 border: `0.5px solid ${form.tipo === t ? '#1A1A1A' : '#E5E5E2'}`,
@@ -251,13 +251,15 @@ function CampFormFields({ form, setForm, error, clientsList }) {
           </select>
         </div>
       </div>
-      <div className="fg">
-        <label className="label">Plataforma</label>
-        <select className="input" value={form.plataforma}
-          onChange={e => setForm(f => ({ ...f, plataforma: e.target.value }))}>
-          {PLATAFORMAS.map(p => <option key={p}>{p}</option>)}
-        </select>
-      </div>
+      {!isPlaylisting && (
+        <div className="fg">
+          <label className="label">Plataforma</label>
+          <select className="input" value={form.plataforma}
+            onChange={e => setForm(f => ({ ...f, plataforma: e.target.value }))}>
+            {PLATAFORMAS.map(p => <option key={p}>{p}</option>)}
+          </select>
+        </div>
+      )}
       <div className="form-row-2">
         <div className="fg">
           <label className="label">Fecha inicio</label>
@@ -276,7 +278,6 @@ function CampFormFields({ form, setForm, error, clientsList }) {
           onChange={e => setForm(f => ({ ...f, brief: e.target.value }))} style={{ resize: 'vertical' }} />
       </div>
 
-      {/* Campos especiales según tipo */}
       {isNanoBlast && (
         <div className="fg">
           <label className="label">Contenidos publicados</label>
@@ -302,40 +303,43 @@ function CampFormFields({ form, setForm, error, clientsList }) {
         </div>
       )}
 
-      {/* Reportes de métricas */}
-      {fShowTT && (
-        <div className="fg">
-          <label className="label">Reporte métricas TikTok (opcional)</label>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <input className="input" value={form.reporte_url_tt}
-              onChange={e => setForm(f => ({ ...f, reporte_url_tt: e.target.value }))}
-              placeholder="https://..." style={{ flex: 1 }} />
-            {form.reporte_url_tt && isValidUrl(form.reporte_url_tt) && (
-              <a href={form.reporte_url_tt} target="_blank" rel="noopener noreferrer"
-                style={{ display: 'flex', alignItems: 'center', padding: '0 12px', background: '#F7F7F5', border: '0.5px solid #E5E5E2', borderRadius: 8, fontSize: 12, color: '#555', textDecoration: 'none', whiteSpace: 'nowrap', flexShrink: 0 }}>
-                Abrir ↗
-              </a>
-            )}
-          </div>
-          {error?.includes('TikTok') && <div style={{ fontSize: 12, color: '#A32D2D', marginTop: 5 }}>⚠ {error}</div>}
-        </div>
-      )}
-      {fShowIG && (
-        <div className="fg">
-          <label className="label">Reporte métricas Instagram (opcional)</label>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <input className="input" value={form.reporte_url_ig}
-              onChange={e => setForm(f => ({ ...f, reporte_url_ig: e.target.value }))}
-              placeholder="https://..." style={{ flex: 1 }} />
-            {form.reporte_url_ig && isValidUrl(form.reporte_url_ig) && (
-              <a href={form.reporte_url_ig} target="_blank" rel="noopener noreferrer"
-                style={{ display: 'flex', alignItems: 'center', padding: '0 12px', background: '#F7F7F5', border: '0.5px solid #E5E5E2', borderRadius: 8, fontSize: 12, color: '#555', textDecoration: 'none', whiteSpace: 'nowrap', flexShrink: 0 }}>
-                Abrir ↗
-              </a>
-            )}
-          </div>
-          {error?.includes('Instagram') && <div style={{ fontSize: 12, color: '#A32D2D', marginTop: 5 }}>⚠ {error}</div>}
-        </div>
+      {!isPlaylisting && (
+        <>
+          {fShowTT && (
+            <div className="fg">
+              <label className="label">Reporte métricas TikTok (opcional)</label>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input className="input" value={form.reporte_url_tt}
+                  onChange={e => setForm(f => ({ ...f, reporte_url_tt: e.target.value }))}
+                  placeholder="https://..." style={{ flex: 1 }} />
+                {form.reporte_url_tt && isValidUrl(form.reporte_url_tt) && (
+                  <a href={form.reporte_url_tt} target="_blank" rel="noopener noreferrer"
+                    style={{ display: 'flex', alignItems: 'center', padding: '0 12px', background: '#F7F7F5', border: '0.5px solid #E5E5E2', borderRadius: 8, fontSize: 12, color: '#555', textDecoration: 'none', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                    Abrir ↗
+                  </a>
+                )}
+              </div>
+              {error?.includes('TikTok') && <div style={{ fontSize: 12, color: '#A32D2D', marginTop: 5 }}>⚠ {error}</div>}
+            </div>
+          )}
+          {fShowIG && (
+            <div className="fg">
+              <label className="label">Reporte métricas Instagram (opcional)</label>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input className="input" value={form.reporte_url_ig}
+                  onChange={e => setForm(f => ({ ...f, reporte_url_ig: e.target.value }))}
+                  placeholder="https://..." style={{ flex: 1 }} />
+                {form.reporte_url_ig && isValidUrl(form.reporte_url_ig) && (
+                  <a href={form.reporte_url_ig} target="_blank" rel="noopener noreferrer"
+                    style={{ display: 'flex', alignItems: 'center', padding: '0 12px', background: '#F7F7F5', border: '0.5px solid #E5E5E2', borderRadius: 8, fontSize: 12, color: '#555', textDecoration: 'none', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                    Abrir ↗
+                  </a>
+                )}
+              </div>
+              {error?.includes('Instagram') && <div style={{ fontSize: 12, color: '#A32D2D', marginTop: 5 }}>⚠ {error}</div>}
+            </div>
+          )}
+        </>
       )}
       {error && !error.includes('TikTok') && !error.includes('Instagram') && (
         <div style={{ fontSize: 12, color: '#A32D2D' }}>⚠ {error}</div>
@@ -378,7 +382,27 @@ export default function Campanas({ initialCamp = null }) {
   const [deleteCI, setDeleteCI] = useState(null)
   const [changeEstadoModal, setChangeEstadoModal] = useState(false)
 
+  // Playlists
+  const [playlists, setPlaylists] = useState([])
+  const [playlistForm, setPlaylistForm] = useState({ nombre: '', link: '' })
+  const [savingPlaylist, setSavingPlaylist] = useState(false)
+  const [deletePlaylistId, setDeletePlaylistId] = useState(null)
+  const [editPlaylistModal, setEditPlaylistModal] = useState(false)
+  const [editPlaylist, setEditPlaylist] = useState(null)
+  const [editPlaylistForm, setEditPlaylistForm] = useState({ nombre: '', link: '' })
+
   useEffect(() => { fetchCamps(); fetchRosterAndClients() }, [])
+
+  useEffect(() => {
+    if (currentCamp?.tipo === 'Playlisting') fetchPlaylists(currentCamp.id)
+  }, [currentCamp?.id, currentCamp?.tipo])
+
+  async function fetchPlaylists(campId) {
+    try {
+      const data = await sql`SELECT * FROM campaign_playlists WHERE campaign_id = ${campId} ORDER BY created_at ASC`
+      setPlaylists(data)
+    } catch (e) { console.error(e) }
+  }
 
   async function fetchCamps() {
     setLoading(true)
@@ -582,6 +606,42 @@ export default function Campanas({ initialCamp = null }) {
     } catch (e) { console.error(e) }
   }
 
+  // Playlist CRUD
+  async function addPlaylist() {
+    if (!playlistForm.nombre.trim() || !playlistForm.link.trim()) return
+    if (!isValidUrl(playlistForm.link)) return alert('El link no es una URL válida.')
+    setSavingPlaylist(true)
+    try {
+      await sql`INSERT INTO campaign_playlists (campaign_id, nombre, link) VALUES (${currentCamp.id}, ${playlistForm.nombre}, ${playlistForm.link})`
+      setPlaylistForm({ nombre: '', link: '' })
+      await fetchPlaylists(currentCamp.id)
+    } catch (e) { console.error(e) }
+    setSavingPlaylist(false)
+  }
+
+  async function deletePlaylist(id) {
+    try {
+      await sql`DELETE FROM campaign_playlists WHERE id = ${id}`
+      setDeletePlaylistId(null)
+      await fetchPlaylists(currentCamp.id)
+    } catch (e) { console.error(e) }
+  }
+
+  function openEditPlaylist(pl) {
+    setEditPlaylist(pl)
+    setEditPlaylistForm({ nombre: pl.nombre, link: pl.link })
+    setEditPlaylistModal(true)
+  }
+
+  async function saveEditPlaylist() {
+    if (!editPlaylistForm.nombre.trim() || !editPlaylistForm.link.trim()) return
+    try {
+      await sql`UPDATE campaign_playlists SET nombre = ${editPlaylistForm.nombre}, link = ${editPlaylistForm.link} WHERE id = ${editPlaylist.id}`
+      setEditPlaylistModal(false)
+      await fetchPlaylists(currentCamp.id)
+    } catch (e) { console.error(e) }
+  }
+
   function openAddInfModal() {
     setSelectedInfIds([])
     setInfSearch('')
@@ -693,7 +753,7 @@ export default function Campanas({ initialCamp = null }) {
   const plat = currentCamp?.plataforma || 'Ambas'
   const showIG = plat === 'Ambas' || plat === 'Instagram'
   const showTT = plat === 'Ambas' || plat === 'TikTok'
-  const isEspecial = currentCamp && (currentCamp.tipo === 'Nano Blast' || currentCamp.tipo === 'Clipping')
+  const isEspecial = currentCamp && (currentCamp.tipo === 'Nano Blast' || currentCamp.tipo === 'Clipping' || currentCamp.tipo === 'Playlisting')
 
   function VideoLinkFields({ form, setForm }) {
     return (
@@ -754,13 +814,7 @@ export default function Campanas({ initialCamp = null }) {
     const clientColor = currentCamp.client_color || '#E8313A'
     const hasReporteTT = showTT && currentCamp.reporte_url_tt
     const hasReporteIG = showIG && currentCamp.reporte_url_ig
-
-    // Badge tipo campaña
-    const tipoBadge = currentCamp.tipo !== 'Estándar' ? (
-      <span style={{ fontSize: 11, padding: '2px 9px', borderRadius: 20, background: '#1A1A1A', color: '#fff' }}>
-        {currentCamp.tipo}
-      </span>
-    ) : null
+    const isPlaylisting = currentCamp.tipo === 'Playlisting'
 
     return (
       <div style={{ padding: '20px 24px' }}>
@@ -773,22 +827,18 @@ export default function Campanas({ initialCamp = null }) {
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
               <h1 style={{ fontSize: 20, fontWeight: 500 }}>{currentCamp.nombre}</h1>
               <span style={{ fontSize: 11, padding: '2px 9px', borderRadius: 20, background: ec.bg, color: ec.color }}>{currentCamp.estado}</span>
-              <span style={{ fontSize: 11, padding: '2px 9px', borderRadius: 20, background: '#F0F0EE', color: '#666' }}>{plat}</span>
-              {tipoBadge}
+              {!isPlaylisting && <span style={{ fontSize: 11, padding: '2px 9px', borderRadius: 20, background: '#F0F0EE', color: '#666' }}>{plat}</span>}
+              {currentCamp.tipo !== 'Estándar' && <span style={{ fontSize: 11, padding: '2px 9px', borderRadius: 20, background: '#1A1A1A', color: '#fff' }}>{currentCamp.tipo}</span>}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
-              {currentCamp.client_nombre && (
-                <span style={{ fontSize: 12, color: clientColor, fontWeight: 500 }}>{currentCamp.client_nombre}</span>
-              )}
-              {currentCamp.artista && (
-                <span style={{ fontSize: 12, color: '#888' }}>· {currentCamp.artista}{currentCamp.cancion ? ` — "${currentCamp.cancion}"` : ''}</span>
-              )}
+              {currentCamp.client_nombre && <span style={{ fontSize: 12, color: clientColor, fontWeight: 500 }}>{currentCamp.client_nombre}</span>}
+              {currentCamp.artista && <span style={{ fontSize: 12, color: '#888' }}>· {currentCamp.artista}{currentCamp.cancion ? ` — "${currentCamp.cancion}"` : ''}</span>}
             </div>
           </div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
             {hasReporteTT && (
               <a href={currentCamp.reporte_url_tt} target="_blank" rel="noopener noreferrer"
-                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8, fontSize: 12.5, background: '#1A1A1A', color: '#fff', textDecoration: 'none', transition: 'all .15s' }}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8, fontSize: 12.5, background: '#1A1A1A', color: '#fff', textDecoration: 'none' }}
                 onMouseEnter={e => e.currentTarget.style.background = '#333'}
                 onMouseLeave={e => e.currentTarget.style.background = '#1A1A1A'}
               >
@@ -798,7 +848,7 @@ export default function Campanas({ initialCamp = null }) {
             )}
             {hasReporteIG && (
               <a href={currentCamp.reporte_url_ig} target="_blank" rel="noopener noreferrer"
-                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8, fontSize: 12.5, background: '#1A1A1A', color: '#fff', textDecoration: 'none', transition: 'all .15s' }}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8, fontSize: 12.5, background: '#1A1A1A', color: '#fff', textDecoration: 'none' }}
                 onMouseEnter={e => e.currentTarget.style.background = '#333'}
                 onMouseLeave={e => e.currentTarget.style.background = '#1A1A1A'}
               >
@@ -825,11 +875,9 @@ export default function Campanas({ initialCamp = null }) {
           </div>
         )}
 
-        {/* KPIs especiales para Nano Blast y Clipping */}
-        {isEspecial && (
-          <div style={{
-            display: 'flex', gap: 12, marginBottom: 20,
-          }}>
+        {/* KPIs especiales */}
+        {(currentCamp.tipo === 'Nano Blast' || currentCamp.tipo === 'Clipping') && (
+          <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
             {currentCamp.tipo === 'Nano Blast' && (
               <div style={{ background: '#F7F7F5', border: '0.5px solid #E5E5E2', borderRadius: 12, padding: '14px 20px', flex: 1 }}>
                 <div style={{ fontSize: 10.5, color: '#AAA', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 4 }}>Contenidos publicados</div>
@@ -852,10 +900,96 @@ export default function Campanas({ initialCamp = null }) {
           </div>
         )}
 
+        {/* KPI Playlisting */}
+        {isPlaylisting && (
+          <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
+            <div style={{ background: '#F7F7F5', border: '0.5px solid #E5E5E2', borderRadius: 12, padding: '14px 20px', flex: 1 }}>
+              <div style={{ fontSize: 10.5, color: '#AAA', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 4 }}>Playlists</div>
+              <div style={{ fontSize: 28, fontWeight: 500 }}>{playlists.length}</div>
+              <div style={{ fontSize: 11, color: '#AAA', marginTop: 2 }}>en Spotify</div>
+            </div>
+          </div>
+        )}
+
         <BudgetSummary camp={currentCamp} />
         <SharePanel camp={currentCamp} onUpdate={fetchCamps} />
 
-        {/* Solo mostrar tabs si es campaña estándar */}
+        {/* Vista Playlisting */}
+        {isPlaylisting && (
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <h2 style={{ fontSize: 14, fontWeight: 500 }}>Playlists de Spotify</h2>
+            </div>
+
+            {/* Agregar playlist */}
+            {!isReadOnly && (
+              <div style={{ background: '#F7F7F5', border: '0.5px solid #E5E5E2', borderRadius: 10, padding: 14, marginBottom: 16 }}>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+                  <div className="fg" style={{ flex: 1, margin: 0 }}>
+                    <label className="label">Nombre de la playlist</label>
+                    <input className="input" value={playlistForm.nombre}
+                      onChange={e => setPlaylistForm(f => ({ ...f, nombre: e.target.value }))}
+                      placeholder="Ej: Hits del Verano" />
+                  </div>
+                  <div className="fg" style={{ flex: 2, margin: 0 }}>
+                    <label className="label">Link de Spotify</label>
+                    <input className="input" value={playlistForm.link}
+                      onChange={e => setPlaylistForm(f => ({ ...f, link: e.target.value }))}
+                      placeholder="https://open.spotify.com/playlist/..." />
+                  </div>
+                  <button className="btn-red" onClick={addPlaylist} disabled={savingPlaylist || !playlistForm.nombre.trim() || !playlistForm.link.trim()}
+                    style={{ flexShrink: 0 }}>
+                    {savingPlaylist ? '...' : '+ Agregar'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div className="card" style={{ overflow: 'hidden' }}>
+              {playlists.length === 0 ? (
+                <div style={{ padding: 40, textAlign: 'center', color: '#AAA', fontSize: 13 }}>
+                  No hay playlists agregadas todavía.
+                </div>
+              ) : (
+                playlists.map((pl, i) => (
+                  <div key={pl.id} style={{
+                    display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px',
+                    borderBottom: i < playlists.length - 1 ? '0.5px solid #F0F0EE' : 'none',
+                  }}>
+                    {/* Ícono Spotify */}
+                    <div style={{ width: 36, height: 36, borderRadius: 8, background: '#1DB954', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="white">
+                        <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/>
+                      </svg>
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13.5, fontWeight: 500 }}>{pl.nombre}</div>
+                      <a href={pl.link} target="_blank" rel="noopener noreferrer"
+                        style={{ fontSize: 11.5, color: '#1DB954', textDecoration: 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block', maxWidth: '100%' }}
+                        onMouseEnter={e => e.currentTarget.style.textDecoration = 'underline'}
+                        onMouseLeave={e => e.currentTarget.style.textDecoration = 'none'}
+                      >
+                        {pl.link}
+                      </a>
+                    </div>
+                    <a href={pl.link} target="_blank" rel="noopener noreferrer"
+                      style={{ fontSize: 12, padding: '5px 12px', borderRadius: 7, background: '#1DB954', color: '#fff', textDecoration: 'none', flexShrink: 0 }}>
+                      Abrir ↗
+                    </a>
+                    {!isReadOnly && (
+                      <div style={{ display: 'flex', gap: 4 }}>
+                        <button className="btn-icon" onClick={() => openEditPlaylist(pl)}>✎</button>
+                        <button className="btn-icon btn-icon-danger" onClick={() => setDeletePlaylistId(pl.id)}>✕</button>
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Tabs estándar */}
         {!isEspecial && (
           <>
             <div style={{ display: 'flex', gap: 2, background: '#F0F0EE', borderRadius: 10, padding: 3, marginBottom: 20, width: 'fit-content', border: '0.5px solid #E5E5E2' }}>
@@ -881,14 +1015,14 @@ export default function Campanas({ initialCamp = null }) {
                       <button className="btn-ghost" style={{ fontSize: 12 }} onClick={() => {
                         const links = currentCamp.influencers.map(i => i.video_link_tt).filter(l => l && l.trim())
                         if (!links.length) return alert('No hay links de TikTok cargados')
-                        navigator.clipboard.writeText(links.join('\n')).then(() => alert(`${links.length} links de TikTok copiados`)).catch(() => prompt('Copia:', links.join('\n')))
+                        navigator.clipboard.writeText(links.join('\n')).then(() => alert(`${links.length} links copiados`)).catch(() => prompt('Copia:', links.join('\n')))
                       }}>Copiar links TT</button>
                     )}
                     {showIG && (
                       <button className="btn-ghost" style={{ fontSize: 12 }} onClick={() => {
                         const links = currentCamp.influencers.map(i => i.video_link_ig).filter(l => l && l.trim())
                         if (!links.length) return alert('No hay links de Instagram cargados')
-                        navigator.clipboard.writeText(links.join('\n')).then(() => alert(`${links.length} links de Instagram copiados`)).catch(() => prompt('Copia:', links.join('\n')))
+                        navigator.clipboard.writeText(links.join('\n')).then(() => alert(`${links.length} links copiados`)).catch(() => prompt('Copia:', links.join('\n')))
                       }}>Copiar links IG</button>
                     )}
                   </div>
@@ -980,7 +1114,7 @@ export default function Campanas({ initialCamp = null }) {
           </>
         )}
 
-        {/* Modal editar campaña */}
+        {/* Modals */}
         <Modal open={editCampModal} onClose={() => setEditCampModal(false)} title="Editar campaña">
           <CampFormFields form={editCampForm} setForm={setEditCampForm} error={editCampFormError} clientsList={clientsList} />
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
@@ -1029,9 +1163,7 @@ export default function Campanas({ initialCamp = null }) {
           </div>
           <div style={{ border: '0.5px solid #E5E5E2', borderRadius: 8, maxHeight: 340, overflowY: 'auto', marginBottom: 14 }}>
             {availableInfs.length === 0 ? (
-              <div style={{ padding: 24, textAlign: 'center', color: '#AAA', fontSize: 13 }}>
-                {infSearch || infFilterTipo || infFilterSize ? 'Sin resultados' : 'Todos los influencers activos ya están en la campaña'}
-              </div>
+              <div style={{ padding: 24, textAlign: 'center', color: '#AAA', fontSize: 13 }}>Sin resultados</div>
             ) : availableInfs.map((inf, i) => {
               const isSelected = selectedInfIds.includes(inf.id)
               const igS = getSize(inf.ig_seguidores)
@@ -1039,9 +1171,9 @@ export default function Campanas({ initialCamp = null }) {
               const tipos = inf.tipos_contenido || []
               return (
                 <div key={inf.id} onClick={() => toggleInfSelection(inf.id)}
-                  style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', cursor: 'pointer', borderBottom: '0.5px solid #F0F0EE', background: isSelected ? '#FEF9F9' : 'transparent', transition: 'background .1s' }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', cursor: 'pointer', borderBottom: '0.5px solid #F0F0EE', background: isSelected ? '#FEF9F9' : 'transparent' }}
                 >
-                  <div style={{ width: 18, height: 18, borderRadius: 5, flexShrink: 0, border: `1.5px solid ${isSelected ? '#E8313A' : '#D0D0CC'}`, background: isSelected ? '#E8313A' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all .12s' }}>
+                  <div style={{ width: 18, height: 18, borderRadius: 5, flexShrink: 0, border: `1.5px solid ${isSelected ? '#E8313A' : '#D0D0CC'}`, background: isSelected ? '#E8313A' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     {isSelected && <span style={{ fontSize: 11, color: '#fff', fontWeight: 700 }}>✓</span>}
                   </div>
                   <Avatar nombre={inf.nombre} index={i} size={28} />
@@ -1110,6 +1242,31 @@ export default function Campanas({ initialCamp = null }) {
             <button className="btn-danger" onClick={() => removeInfluencer(deleteCI)}>Quitar</button>
           </div>
         </Modal>
+
+        <Modal open={editPlaylistModal} onClose={() => setEditPlaylistModal(false)} title="Editar playlist">
+          <div className="fg">
+            <label className="label">Nombre</label>
+            <input className="input" value={editPlaylistForm.nombre}
+              onChange={e => setEditPlaylistForm(f => ({ ...f, nombre: e.target.value }))} />
+          </div>
+          <div className="fg">
+            <label className="label">Link de Spotify</label>
+            <input className="input" value={editPlaylistForm.link}
+              onChange={e => setEditPlaylistForm(f => ({ ...f, link: e.target.value }))} />
+          </div>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
+            <button className="btn-ghost" onClick={() => setEditPlaylistModal(false)}>Cancelar</button>
+            <button className="btn-red" onClick={saveEditPlaylist}>Guardar</button>
+          </div>
+        </Modal>
+
+        <Modal open={!!deletePlaylistId} onClose={() => setDeletePlaylistId(null)} title="Eliminar playlist">
+          <p style={{ fontSize: 13, color: '#555', marginBottom: 20 }}>¿Eliminar esta playlist?</p>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            <button className="btn-ghost" onClick={() => setDeletePlaylistId(null)}>Cancelar</button>
+            <button className="btn-danger" onClick={() => deletePlaylist(deletePlaylistId)}>Eliminar</button>
+          </div>
+        </Modal>
       </div>
     )
   }
@@ -1145,7 +1302,7 @@ export default function Campanas({ initialCamp = null }) {
             const ec = ESTADO_CAMP_COLORS[camp.estado] || ESTADO_CAMP_COLORS['Activa']
             const isInactive = camp.estado === 'Cerrada' || camp.estado === 'Cancelada'
             const clientColor = camp.client_color || '#AAA'
-            const isEspecialCamp = camp.tipo === 'Nano Blast' || camp.tipo === 'Clipping'
+            const isEspecialCamp = camp.tipo !== 'Estándar'
             return (
               <div key={camp.id} className="card"
                 style={{ padding: 18, cursor: 'pointer', transition: 'border-color .15s', opacity: isInactive ? 0.75 : 1 }}
@@ -1163,11 +1320,13 @@ export default function Campanas({ initialCamp = null }) {
                 {camp.client_nombre && <div style={{ fontSize: 11, color: clientColor, fontWeight: 500, marginBottom: 1 }}>{camp.client_nombre}</div>}
                 <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 8 }}>
                   {camp.artista && <span style={{ fontSize: 11, color: '#888' }}>{camp.artista}{camp.cancion ? ` — "${camp.cancion}"` : ''}</span>}
-                  {camp.tipo !== 'Estándar' && <span style={{ fontSize: 10, background: '#1A1A1A', color: '#fff', padding: '1px 6px', borderRadius: 10 }}>{camp.tipo}</span>}
-                  {!camp.artista && camp.tipo === 'Estándar' && <span style={{ fontSize: 11, color: '#AAA' }}>{camp.plataforma || 'Ambas'}</span>}
+                  {isEspecialCamp && <span style={{ fontSize: 10, background: '#1A1A1A', color: '#fff', padding: '1px 6px', borderRadius: 10 }}>{camp.tipo}</span>}
+                  {!camp.artista && !isEspecialCamp && <span style={{ fontSize: 11, color: '#AAA' }}>{camp.plataforma || 'Ambas'}</span>}
                 </div>
                 <div style={{ display: 'flex', gap: 14, marginBottom: 4 }}>
-                  {isEspecialCamp ? (
+                  {camp.tipo === 'Playlisting' ? (
+                    <div><div style={{ fontSize: 10.5, color: '#AAA' }}>Spotify</div><div style={{ fontSize: 15, fontWeight: 500 }}>Playlisting</div></div>
+                  ) : isEspecialCamp ? (
                     <>
                       <div><div style={{ fontSize: 10.5, color: '#AAA' }}>Contenidos</div><div style={{ fontSize: 15, fontWeight: 500 }}>{fmtNum(camp.contenidos_count)}</div></div>
                       {camp.tipo === 'Clipping' && <div><div style={{ fontSize: 10.5, color: '#AAA' }}>Views</div><div style={{ fontSize: 15, fontWeight: 500 }}>{fmtNum(camp.views_logradas)}</div></div>}
