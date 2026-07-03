@@ -98,6 +98,36 @@ function ReporteBtn({ url, plataforma }) {
   )
 }
 
+function ClippingBar({ logradas, min, max }) {
+  const l = Number(logradas) || 0
+  const mn = Number(min) || 0
+  const mx = Number(max) || 0
+  if (mx === 0) return null
+  const pctLogradas = Math.min(100, Math.round((l / mx) * 100))
+  const pctMin = mn > 0 ? Math.min(100, Math.round((mn / mx) * 100)) : 0
+  const superaMax = l >= mx
+  const superaMin = l >= mn && mn > 0
+  const barColor = superaMax ? '#3B5BDB' : superaMin ? '#639922' : '#AAA'
+  let statusText = '', statusColor = '#AAA', statusBg = '#F0F0EE'
+  if (superaMax) { statusText = 'Meta superada ✓'; statusColor = '#fff'; statusBg = 'rgba(59,91,219,0.25)' }
+  else if (superaMin) { statusText = 'Dentro del rango ✓'; statusColor = '#fff'; statusBg = 'rgba(99,153,34,0.25)' }
+  else if (l > 0) { statusText = 'En progreso'; statusColor = 'rgba(255,255,255,0.6)'; statusBg = 'rgba(255,255,255,0.1)' }
+  return (
+    <div style={{ marginTop: 16 }}>
+      <div style={{ position: 'relative', height: 8, background: 'rgba(255,255,255,0.15)', borderRadius: 4, overflow: 'visible', marginBottom: 8 }}>
+        <div style={{ position: 'absolute', left: 0, top: 0, height: '100%', width: pctLogradas + '%', background: barColor, borderRadius: 4, transition: 'width .4s ease' }} />
+        {mn > 0 && (
+          <div style={{ position: 'absolute', left: pctMin + '%', top: -3, width: 2, height: 14, background: 'rgba(255,255,255,0.5)', borderRadius: 1, transform: 'translateX(-1px)' }} />
+        )}
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        {statusText && <span style={{ fontSize: 11, background: statusBg, color: statusColor, padding: '2px 9px', borderRadius: 20 }}>{statusText}</span>}
+        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginLeft: 'auto' }}>{pctLogradas}% de {fmtNum(mx)}</span>
+      </div>
+    </div>
+  )
+}
+
 function SpotifyIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
@@ -120,7 +150,7 @@ export default function VistaCliente({ token }) {
         SELECT
           id, nombre AS camp_nombre, cliente, plataforma,
           reporte_url_tt, reporte_url_ig,
-          tipo, contenidos_count, views_logradas,
+          tipo, contenidos_count, views_logradas, views_min, views_max,
           artista, cancion
         FROM campaigns
         WHERE share_token = ${t} AND share_active = true
@@ -168,6 +198,8 @@ export default function VistaCliente({ token }) {
           tipo: campInfo.tipo,
           contenidos_count: campInfo.contenidos_count || 0,
           views_logradas: campInfo.views_logradas || 0,
+          views_min: campInfo.views_min || 0,
+          views_max: campInfo.views_max || 0,
           artista: campInfo.artista || '',
           cancion: campInfo.cancion || '',
           influencers: [],
@@ -313,9 +345,21 @@ export default function VistaCliente({ token }) {
                 <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 4 }}>Videos publicados</div>
                 <div style={{ fontSize: 26, fontWeight: 500, color: '#fff' }}>{fmtNum(camp.contenidos_count)}</div>
               </div>
-              <div>
-                <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 4 }}>Views logradas</div>
-                <div style={{ fontSize: 26, fontWeight: 500, color: '#fff' }}>{fmtNum(camp.views_logradas)}</div>
+              <div style={{ flex: 1, minWidth: 200 }}>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
+                  <div>
+                    <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 4 }}>Views logradas</div>
+                    <div style={{ fontSize: 26, fontWeight: 500, color: '#fff' }}>{fmtNum(camp.views_logradas)}</div>
+                  </div>
+                  {camp.views_min > 0 && camp.views_max > 0 && (
+                    <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', paddingBottom: 4 }}>
+                      meta {fmtNum(camp.views_min)} — {fmtNum(camp.views_max)}
+                    </div>
+                  )}
+                </div>
+                {camp.views_max > 0 && (
+                  <ClippingBar logradas={camp.views_logradas} min={camp.views_min} max={camp.views_max} />
+                )}
               </div>
             </>
           )}
