@@ -59,7 +59,6 @@ function fmtNum(n) {
   return n.toLocaleString('es-CL')
 }
 
-// Hook simple para detectar mobile
 function useIsMobile() {
   const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 720 : false)
   useEffect(() => {
@@ -104,12 +103,22 @@ function ReporteBtn({ url, plataforma, isMobile }) {
         background: 'rgba(255,255,255,0.08)', border: '0.5px solid rgba(255,255,255,0.15)',
         color: '#fff', textDecoration: 'none', transition: 'all .15s', flexShrink: 0,
       }}
+      onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.18)' }}
+      onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.08)' }}
     >
       <span style={{ fontSize: 14 }}>◈</span>
       <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.7)', letterSpacing: '.03em' }}>
         Métricas {isTT ? 'TT' : 'IG'}
       </span>
     </a>
+  )
+}
+
+function SpotifyIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/>
+    </svg>
   )
 }
 
@@ -153,9 +162,11 @@ export default function VistaClienteDashboard({ token }) {
           c.tipo, c.contenidos_count, c.views_logradas,
           c.created_at,
           COUNT(DISTINCT ci.id) AS total_influencers,
-          COUNT(DISTINCT CASE WHEN ci.video_link_tt != '' OR ci.video_link_ig != '' THEN ci.id END) AS videos_publicados
+          COUNT(DISTINCT CASE WHEN ci.video_link_tt != '' OR ci.video_link_ig != '' THEN ci.id END) AS videos_publicados,
+          COUNT(DISTINCT cp.id) AS total_playlists
         FROM campaigns c
         LEFT JOIN campaign_influencers ci ON ci.campaign_id = c.id
+        LEFT JOIN campaign_playlists cp ON cp.campaign_id = c.id
         WHERE c.client_id = ${clientInfo.client_id}
         GROUP BY c.id
         ORDER BY c.created_at DESC
@@ -166,11 +177,26 @@ export default function VistaClienteDashboard({ token }) {
   }
 
   async function openCamp(camp) {
+    const isPlaylisting = camp.tipo === 'Playlisting'
     const isEspecial = camp.tipo === 'Nano Blast' || camp.tipo === 'Clipping'
-    if (isEspecial) {
-      setSelectedCamp({ ...camp, influencers: [] })
+
+    if (isPlaylisting) {
+      try {
+        const playlists = await sql`
+          SELECT nombre, link FROM campaign_playlists
+          WHERE campaign_id = ${camp.id}
+          ORDER BY created_at ASC
+        `
+        setSelectedCamp({ ...camp, influencers: [], playlists })
+      } catch (e) { console.error(e) }
       return
     }
+
+    if (isEspecial) {
+      setSelectedCamp({ ...camp, influencers: [], playlists: [] })
+      return
+    }
+
     try {
       const rows = await sql`
         SELECT
@@ -183,7 +209,7 @@ export default function VistaClienteDashboard({ token }) {
         WHERE ci.campaign_id = ${camp.id}
         ORDER BY (i.ig_seguidores + i.tt_seguidores) DESC
       `
-      setSelectedCamp({ ...camp, influencers: rows })
+      setSelectedCamp({ ...camp, influencers: rows, playlists: [] })
     } catch (e) { console.error(e) }
   }
 
@@ -217,14 +243,15 @@ export default function VistaClienteDashboard({ token }) {
     const showBoth = plat === 'Ambas'
     const isNanoBlast = selectedCamp.tipo === 'Nano Blast'
     const isClipping = selectedCamp.tipo === 'Clipping'
-    const isEspecial = isNanoBlast || isClipping
+    const isPlaylisting = selectedCamp.tipo === 'Playlisting'
+    const isEspecial = isNanoBlast || isClipping || isPlaylisting
 
-    const totalIG = selectedCamp.influencers.reduce((s, i) => s + Number(i.ig_seguidores), 0)
-    const totalTT = selectedCamp.influencers.reduce((s, i) => s + Number(i.tt_seguidores), 0)
+    const totalIG = (selectedCamp.influencers || []).reduce((s, i) => s + Number(i.ig_seguidores), 0)
+    const totalTT = (selectedCamp.influencers || []).reduce((s, i) => s + Number(i.tt_seguidores), 0)
     const totalSeg = (showIG ? totalIG : 0) + (showTT ? totalTT : 0)
-    const hasVideoTT = showTT && selectedCamp.influencers.some(i => i.video_link_tt)
-    const hasVideoIG = showIG && selectedCamp.influencers.some(i => i.video_link_ig)
-    const hasBoostcode = selectedCamp.influencers.some(i => i.boostcode && i.boostcode.trim())
+    const hasVideoTT = showTT && (selectedCamp.influencers || []).some(i => i.video_link_tt)
+    const hasVideoIG = showIG && (selectedCamp.influencers || []).some(i => i.video_link_ig)
+    const hasBoostcode = (selectedCamp.influencers || []).some(i => i.boostcode && i.boostcode.trim())
     const hasReporteTT = showTT && selectedCamp.reporte_url_tt
     const hasReporteIG = showIG && selectedCamp.reporte_url_ig
     const hasAnyReporte = hasReporteTT || hasReporteIG
@@ -244,10 +271,8 @@ export default function VistaClienteDashboard({ token }) {
               {client.client_nombre?.slice(0, 2).toUpperCase()}
             </div>
             <span style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.5)' }}>{client.client_nombre}</span>
-            <span
-              style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.6)', cursor: 'pointer', marginLeft: 'auto', padding: '4px 0' }}
-              onClick={() => setSelectedCamp(null)}
-            >← Volver</span>
+            <span style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.6)', cursor: 'pointer', marginLeft: 'auto', padding: '4px 0' }}
+              onClick={() => setSelectedCamp(null)}>← Volver</span>
           </div>
 
           <div style={{ marginBottom: 14 }}>
@@ -266,7 +291,6 @@ export default function VistaClienteDashboard({ token }) {
             )}
           </div>
 
-          {/* Botones reporte */}
           {hasAnyReporte && (
             <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
               {hasReporteTT && <ReporteBtn url={selectedCamp.reporte_url_tt} plataforma="TikTok" isMobile={isMobile} />}
@@ -276,6 +300,12 @@ export default function VistaClienteDashboard({ token }) {
 
           {/* Stats */}
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, auto)', gap: isMobile ? 12 : 20 }}>
+            {isPlaylisting && (
+              <div>
+                <div style={{ fontSize: 9.5, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 3 }}>Playlists</div>
+                <div style={{ fontSize: isMobile ? 18 : 22, fontWeight: 500, color: '#fff' }}>{selectedCamp.playlists?.length || 0}</div>
+              </div>
+            )}
             {isNanoBlast && (
               <div>
                 <div style={{ fontSize: 9.5, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 3 }}>Contenidos publicados</div>
@@ -318,7 +348,49 @@ export default function VistaClienteDashboard({ token }) {
         </div>
 
         <div style={{ padding: isMobile ? '20px 16px' : '24px 40px' }}>
-          {isEspecial && (
+
+          {/* Vista Playlisting */}
+          {isPlaylisting && (
+            <div style={{ background: '#fff', border: '0.5px solid #E5E5E2', borderRadius: 12, overflow: 'hidden' }}>
+              {(!selectedCamp.playlists || selectedCamp.playlists.length === 0) ? (
+                <div style={{ padding: 48, textAlign: 'center', color: '#AAA', fontSize: 13 }}>
+                  Las playlists estarán disponibles próximamente.
+                </div>
+              ) : (
+                selectedCamp.playlists.map((pl, i) => (
+                  <div key={i} style={{
+                    display: 'flex', alignItems: 'center', gap: 14,
+                    padding: isMobile ? '12px 14px' : '14px 20px',
+                    borderBottom: i < selectedCamp.playlists.length - 1 ? '0.5px solid #F0F0EE' : 'none',
+                  }}>
+                    <div style={{ width: 38, height: 38, borderRadius: 9, background: '#1DB954', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: '#fff' }}>
+                      <SpotifyIcon />
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: isMobile ? 13.5 : 14, fontWeight: 500, marginBottom: 2 }}>{pl.nombre}</div>
+                      <div style={{ fontSize: 11.5, color: '#AAA' }}>Spotify Playlist</div>
+                    </div>
+                    <a href={pl.link} target="_blank" rel="noopener noreferrer"
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 5,
+                        padding: isMobile ? '7px 12px' : '8px 16px', borderRadius: 8,
+                        background: '#1DB954', color: '#fff',
+                        textDecoration: 'none', fontSize: 12.5, fontWeight: 500,
+                        flexShrink: 0, minHeight: isMobile ? 36 : 'auto',
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.background = '#17a349'}
+                      onMouseLeave={e => e.currentTarget.style.background = '#1DB954'}
+                    >
+                      <SpotifyIcon /> {isMobile ? '↗' : 'Abrir ↗'}
+                    </a>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+
+          {/* Vista Nano Blast / Clipping */}
+          {(isNanoBlast || isClipping) && (
             <div style={{ textAlign: 'center', padding: isMobile ? '32px 16px' : '48px 0', color: '#888', fontSize: 13 }}>
               {hasAnyReporte
                 ? 'Usa los botones de métricas arriba para ver el reporte completo.'
@@ -326,6 +398,7 @@ export default function VistaClienteDashboard({ token }) {
             </div>
           )}
 
+          {/* Vista Estándar — tabla influencers */}
           {!isEspecial && (
             <div style={{ background: '#fff', border: '0.5px solid #E5E5E2', borderRadius: 12, overflow: 'hidden' }}>
               <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
@@ -466,7 +539,6 @@ export default function VistaClienteDashboard({ token }) {
     )
 
   const activeFiltersCount = [filterEstado, filterAnio].filter(Boolean).length
-
   const kpiList = [
     { label: 'Total campañas', value: totalCamps },
     { label: 'Activas', value: activas },
@@ -487,14 +559,7 @@ export default function VistaClienteDashboard({ token }) {
             <h1 style={{ fontSize: isMobile ? 18 : 22, fontWeight: 500, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{client.client_nombre}</h1>
           </div>
         </div>
-
-        {/* KPIs — grid 2 cols en mobile, fila en desktop */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: isMobile ? 'repeat(3, 1fr)' : 'repeat(5, auto)',
-          gap: isMobile ? '14px 8px' : 32,
-          width: isMobile ? '100%' : 'fit-content',
-        }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(3, 1fr)' : 'repeat(5, auto)', gap: isMobile ? '14px 8px' : 32, width: isMobile ? '100%' : 'fit-content' }}>
           {kpiList.map(({ label, value }) => (
             <div key={label}>
               <div style={{ fontSize: isMobile ? 9 : 10, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 3, lineHeight: 1.3 }}>{label}</div>
@@ -505,31 +570,17 @@ export default function VistaClienteDashboard({ token }) {
       </div>
 
       <div style={{ padding: isMobile ? '18px 16px' : '28px 40px' }}>
-
-        {/* Filtros */}
         {isMobile ? (
           <div style={{ marginBottom: 16 }}>
             <div style={{ display: 'flex', gap: 8 }}>
               <input className="input" placeholder="Buscar campaña, artista..."
                 value={search} onChange={e => setSearch(e.target.value)}
                 style={{ flex: 1, minHeight: 42, fontSize: 14 }} />
-              <button
-                onClick={() => setFiltersOpen(o => !o)}
-                style={{
-                  minHeight: 42, minWidth: 42, borderRadius: 8,
-                  border: '0.5px solid #E5E5E2', background: activeFiltersCount > 0 ? '#FCEBEB' : '#fff',
-                  color: activeFiltersCount > 0 ? '#A32D2D' : '#555',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 16, position: 'relative', flexShrink: 0,
-                }}
-              >
+              <button onClick={() => setFiltersOpen(o => !o)}
+                style={{ minHeight: 42, minWidth: 42, borderRadius: 8, border: '0.5px solid #E5E5E2', background: activeFiltersCount > 0 ? '#FCEBEB' : '#fff', color: activeFiltersCount > 0 ? '#A32D2D' : '#555', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, position: 'relative', flexShrink: 0 }}>
                 ⚙
                 {activeFiltersCount > 0 && (
-                  <span style={{
-                    position: 'absolute', top: -4, right: -4, width: 16, height: 16,
-                    borderRadius: '50%', background: '#E8313A', color: '#fff',
-                    fontSize: 9, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  }}>{activeFiltersCount}</span>
+                  <span style={{ position: 'absolute', top: -4, right: -4, width: 16, height: 16, borderRadius: '50%', background: '#E8313A', color: '#fff', fontSize: 9, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{activeFiltersCount}</span>
                 )}
               </button>
             </div>
@@ -537,8 +588,7 @@ export default function VistaClienteDashboard({ token }) {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8, background: '#fff', border: '0.5px solid #E5E5E2', borderRadius: 10, padding: 12 }}>
                 <select className="input" value={filterEstado} onChange={e => setFilterEstado(e.target.value)} style={{ minHeight: 42 }}>
                   <option value="">Todos los estados</option>
-                  <option>Activa</option><option>Pausada</option>
-                  <option>Cerrada</option><option>Cancelada</option>
+                  <option>Activa</option><option>Pausada</option><option>Cerrada</option><option>Cancelada</option>
                 </select>
                 {anios.length > 1 && (
                   <select className="input" value={filterAnio} onChange={e => setFilterAnio(e.target.value)} style={{ minHeight: 42 }}>
@@ -556,12 +606,10 @@ export default function VistaClienteDashboard({ token }) {
         ) : (
           <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
             <input className="input" placeholder="Buscar campaña, artista..."
-              value={search} onChange={e => setSearch(e.target.value)}
-              style={{ flex: 1, maxWidth: 280 }} />
+              value={search} onChange={e => setSearch(e.target.value)} style={{ flex: 1, maxWidth: 280 }} />
             <select className="input" value={filterEstado} onChange={e => setFilterEstado(e.target.value)}>
               <option value="">Todos los estados</option>
-              <option>Activa</option><option>Pausada</option>
-              <option>Cerrada</option><option>Cancelada</option>
+              <option>Activa</option><option>Pausada</option><option>Cerrada</option><option>Cancelada</option>
             </select>
             {anios.length > 1 && (
               <select className="input" value={filterAnio} onChange={e => setFilterAnio(e.target.value)}>
@@ -576,7 +624,6 @@ export default function VistaClienteDashboard({ token }) {
           </div>
         )}
 
-        {/* Lista campañas */}
         {filtered.length === 0 ? (
           <div style={{ padding: 40, textAlign: 'center', color: '#AAA', fontSize: 13 }}>Sin resultados</div>
         ) : (
@@ -586,18 +633,13 @@ export default function VistaClienteDashboard({ token }) {
               const plat = camp.plataforma || 'Ambas'
               const hasTT = (plat === 'Ambas' || plat === 'TikTok') && camp.reporte_url_tt
               const hasIG = (plat === 'Ambas' || plat === 'Instagram') && camp.reporte_url_ig
-              const isEspecialCamp = camp.tipo === 'Nano Blast' || camp.tipo === 'Clipping'
+              const isEspecialCamp = camp.tipo !== 'Estándar'
+              const isPlaylistingCamp = camp.tipo === 'Playlisting'
 
-              // ─── Tarjeta mobile: layout vertical ───
               if (isMobile) {
                 return (
-                  <div key={camp.id}
-                    onClick={() => openCamp(camp)}
-                    style={{
-                      background: '#fff', border: '0.5px solid #E5E5E2', borderRadius: 12,
-                      padding: '14px 14px 12px', cursor: 'pointer',
-                      borderLeft: `3px solid ${brandColor}`,
-                    }}
+                  <div key={camp.id} onClick={() => openCamp(camp)}
+                    style={{ background: '#fff', border: '0.5px solid #E5E5E2', borderRadius: 12, padding: '14px 14px 12px', cursor: 'pointer', borderLeft: `3px solid ${brandColor}` }}
                   >
                     <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 6 }}>
                       <div style={{ minWidth: 0, flex: 1 }}>
@@ -608,30 +650,27 @@ export default function VistaClienteDashboard({ token }) {
                       </div>
                       <span style={{ fontSize: 18, color: '#CCC', flexShrink: 0 }}>›</span>
                     </div>
-
                     <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginBottom: 10 }}>
                       <span style={{ background: ec.bg, color: ec.color, padding: '2px 8px', borderRadius: 20, fontSize: 10.5 }}>{camp.estado}</span>
-                      {isEspecialCamp && (
-                        <span style={{ fontSize: 10, background: '#1A1A1A', color: '#fff', padding: '2px 8px', borderRadius: 20 }}>{camp.tipo}</span>
-                      )}
+                      {isEspecialCamp && <span style={{ fontSize: 10, background: '#1A1A1A', color: '#fff', padding: '2px 8px', borderRadius: 20 }}>{camp.tipo}</span>}
                     </div>
-
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
                       <div style={{ display: 'flex', gap: 16 }}>
-                        {isEspecialCamp ? (
+                        {isPlaylistingCamp ? (
+                          <div>
+                            <div style={{ fontSize: 15, fontWeight: 500 }}>{fmtNum(camp.total_playlists)}</div>
+                            <div style={{ fontSize: 9.5, color: '#AAA', textTransform: 'uppercase' }}>Playlists</div>
+                          </div>
+                        ) : isEspecialCamp ? (
                           <>
                             <div>
                               <div style={{ fontSize: 15, fontWeight: 500 }}>{fmtNum(camp.contenidos_count)}</div>
-                              <div style={{ fontSize: 9.5, color: '#AAA', textTransform: 'uppercase' }}>
-                                {camp.tipo === 'Clipping' ? 'Videos' : 'Contenidos'}
-                              </div>
+                              <div style={{ fontSize: 9.5, color: '#AAA', textTransform: 'uppercase' }}>{camp.tipo === 'Clipping' ? 'Videos' : 'Contenidos'}</div>
                             </div>
-                            {camp.tipo === 'Clipping' && (
-                              <div>
-                                <div style={{ fontSize: 15, fontWeight: 500 }}>{fmtNum(camp.views_logradas)}</div>
-                                <div style={{ fontSize: 9.5, color: '#AAA', textTransform: 'uppercase' }}>Views</div>
-                              </div>
-                            )}
+                            {camp.tipo === 'Clipping' && <div>
+                              <div style={{ fontSize: 15, fontWeight: 500 }}>{fmtNum(camp.views_logradas)}</div>
+                              <div style={{ fontSize: 9.5, color: '#AAA', textTransform: 'uppercase' }}>Views</div>
+                            </div>}
                           </>
                         ) : (
                           <>
@@ -646,25 +685,10 @@ export default function VistaClienteDashboard({ token }) {
                           </>
                         )}
                       </div>
-
                       {(hasTT || hasIG) && (
                         <div style={{ display: 'flex', gap: 6 }}>
-                          {hasTT && (
-                            <a href={camp.reporte_url_tt} target="_blank" rel="noopener noreferrer"
-                              onClick={e => e.stopPropagation()}
-                              style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '7px 11px', minHeight: 36, borderRadius: 8, background: '#F7F7F5', border: '0.5px solid #E5E5E2', color: '#555', textDecoration: 'none', fontSize: 10.5 }}
-                            >
-                              <span style={{ fontSize: 12 }}>◈</span> TT
-                            </a>
-                          )}
-                          {hasIG && (
-                            <a href={camp.reporte_url_ig} target="_blank" rel="noopener noreferrer"
-                              onClick={e => e.stopPropagation()}
-                              style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '7px 11px', minHeight: 36, borderRadius: 8, background: '#F7F7F5', border: '0.5px solid #E5E5E2', color: '#555', textDecoration: 'none', fontSize: 10.5 }}
-                            >
-                              <span style={{ fontSize: 12 }}>◈</span> IG
-                            </a>
-                          )}
+                          {hasTT && <a href={camp.reporte_url_tt} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '7px 11px', minHeight: 36, borderRadius: 8, background: '#F7F7F5', border: '0.5px solid #E5E5E2', color: '#555', textDecoration: 'none', fontSize: 10.5 }}><span style={{ fontSize: 12 }}>◈</span> TT</a>}
+                          {hasIG && <a href={camp.reporte_url_ig} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '7px 11px', minHeight: 36, borderRadius: 8, background: '#F7F7F5', border: '0.5px solid #E5E5E2', color: '#555', textDecoration: 'none', fontSize: 10.5 }}><span style={{ fontSize: 12 }}>◈</span> IG</a>}
                         </div>
                       )}
                     </div>
@@ -672,14 +696,9 @@ export default function VistaClienteDashboard({ token }) {
                 )
               }
 
-              // ─── Tarjeta desktop: layout horizontal (igual a versión anterior) ───
               return (
                 <div key={camp.id}
-                  style={{
-                    background: '#fff', border: '0.5px solid #E5E5E2', borderRadius: 12,
-                    padding: '16px 20px', cursor: 'pointer', transition: 'all .15s',
-                    display: 'flex', alignItems: 'center', gap: 16,
-                  }}
+                  style={{ background: '#fff', border: '0.5px solid #E5E5E2', borderRadius: 12, padding: '16px 20px', cursor: 'pointer', transition: 'all .15s', display: 'flex', alignItems: 'center', gap: 16 }}
                   onClick={() => openCamp(camp)}
                   onMouseEnter={e => { e.currentTarget.style.borderColor = brandColor; e.currentTarget.style.transform = 'translateX(2px)' }}
                   onMouseLeave={e => { e.currentTarget.style.borderColor = '#E5E5E2'; e.currentTarget.style.transform = 'none' }}
@@ -689,9 +708,7 @@ export default function VistaClienteDashboard({ token }) {
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
                       <span style={{ fontSize: 14, fontWeight: 500 }}>{camp.nombre}</span>
                       <span style={{ background: ec.bg, color: ec.color, padding: '1px 8px', borderRadius: 20, fontSize: 10.5 }}>{camp.estado}</span>
-                      {isEspecialCamp && (
-                        <span style={{ fontSize: 10, background: '#1A1A1A', color: '#fff', padding: '1px 7px', borderRadius: 20 }}>{camp.tipo}</span>
-                      )}
+                      {isEspecialCamp && <span style={{ fontSize: 10, background: '#1A1A1A', color: '#fff', padding: '1px 7px', borderRadius: 20 }}>{camp.tipo}</span>}
                     </div>
                     <div style={{ fontSize: 12, color: '#AAA' }}>
                       {camp.artista && <span>{camp.artista}</span>}
@@ -699,22 +716,22 @@ export default function VistaClienteDashboard({ token }) {
                       {!camp.artista && !camp.cancion && <span>Sin artista asignado</span>}
                     </div>
                   </div>
-
                   <div style={{ display: 'flex', gap: 20, flexShrink: 0, alignItems: 'center' }}>
-                    {isEspecialCamp ? (
+                    {isPlaylistingCamp ? (
+                      <div style={{ textAlign: 'center' }}>
+                        <div style={{ fontSize: 16, fontWeight: 500 }}>{fmtNum(camp.total_playlists)}</div>
+                        <div style={{ fontSize: 10, color: '#AAA', textTransform: 'uppercase', letterSpacing: '.06em' }}>Playlists</div>
+                      </div>
+                    ) : isEspecialCamp ? (
                       <>
                         <div style={{ textAlign: 'center' }}>
                           <div style={{ fontSize: 16, fontWeight: 500 }}>{fmtNum(camp.contenidos_count)}</div>
-                          <div style={{ fontSize: 10, color: '#AAA', textTransform: 'uppercase', letterSpacing: '.06em' }}>
-                            {camp.tipo === 'Clipping' ? 'Videos' : 'Contenidos'}
-                          </div>
+                          <div style={{ fontSize: 10, color: '#AAA', textTransform: 'uppercase', letterSpacing: '.06em' }}>{camp.tipo === 'Clipping' ? 'Videos' : 'Contenidos'}</div>
                         </div>
-                        {camp.tipo === 'Clipping' && (
-                          <div style={{ textAlign: 'center' }}>
-                            <div style={{ fontSize: 16, fontWeight: 500 }}>{fmtNum(camp.views_logradas)}</div>
-                            <div style={{ fontSize: 10, color: '#AAA', textTransform: 'uppercase', letterSpacing: '.06em' }}>Views</div>
-                          </div>
-                        )}
+                        {camp.tipo === 'Clipping' && <div style={{ textAlign: 'center' }}>
+                          <div style={{ fontSize: 16, fontWeight: 500 }}>{fmtNum(camp.views_logradas)}</div>
+                          <div style={{ fontSize: 10, color: '#AAA', textTransform: 'uppercase', letterSpacing: '.06em' }}>Views</div>
+                        </div>}
                       </>
                     ) : (
                       <>
@@ -734,31 +751,10 @@ export default function VistaClienteDashboard({ token }) {
                       </div>
                       <div style={{ fontSize: 10, color: '#AAA', textTransform: 'uppercase', letterSpacing: '.06em' }}>Inicio</div>
                     </div>
-
                     {(hasTT || hasIG) && (
                       <div style={{ display: 'flex', gap: 6 }}>
-                        {hasTT && (
-                          <a href={camp.reporte_url_tt} target="_blank" rel="noopener noreferrer"
-                            onClick={e => e.stopPropagation()}
-                            style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2, padding: '5px 9px', borderRadius: 8, minWidth: 60, background: '#F7F7F5', border: '0.5px solid #E5E5E2', color: '#555', textDecoration: 'none', transition: 'all .15s' }}
-                            onMouseEnter={e => { e.currentTarget.style.background = '#111'; e.currentTarget.style.color = '#fff'; e.currentTarget.style.borderColor = '#111' }}
-                            onMouseLeave={e => { e.currentTarget.style.background = '#F7F7F5'; e.currentTarget.style.color = '#555'; e.currentTarget.style.borderColor = '#E5E5E2' }}
-                          >
-                            <span style={{ fontSize: 12 }}>◈</span>
-                            <span style={{ fontSize: 8, letterSpacing: '.03em' }}>Métricas TT</span>
-                          </a>
-                        )}
-                        {hasIG && (
-                          <a href={camp.reporte_url_ig} target="_blank" rel="noopener noreferrer"
-                            onClick={e => e.stopPropagation()}
-                            style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2, padding: '5px 9px', borderRadius: 8, minWidth: 60, background: '#F7F7F5', border: '0.5px solid #E5E5E2', color: '#555', textDecoration: 'none', transition: 'all .15s' }}
-                            onMouseEnter={e => { e.currentTarget.style.background = '#111'; e.currentTarget.style.color = '#fff'; e.currentTarget.style.borderColor = '#111' }}
-                            onMouseLeave={e => { e.currentTarget.style.background = '#F7F7F5'; e.currentTarget.style.color = '#555'; e.currentTarget.style.borderColor = '#E5E5E2' }}
-                          >
-                            <span style={{ fontSize: 12 }}>◈</span>
-                            <span style={{ fontSize: 8, letterSpacing: '.03em' }}>Métricas IG</span>
-                          </a>
-                        )}
+                        {hasTT && <a href={camp.reporte_url_tt} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2, padding: '5px 9px', borderRadius: 8, minWidth: 60, background: '#F7F7F5', border: '0.5px solid #E5E5E2', color: '#555', textDecoration: 'none', transition: 'all .15s' }} onMouseEnter={e => { e.currentTarget.style.background = '#111'; e.currentTarget.style.color = '#fff'; e.currentTarget.style.borderColor = '#111' }} onMouseLeave={e => { e.currentTarget.style.background = '#F7F7F5'; e.currentTarget.style.color = '#555'; e.currentTarget.style.borderColor = '#E5E5E2' }}><span style={{ fontSize: 12 }}>◈</span><span style={{ fontSize: 8, letterSpacing: '.03em' }}>Métricas TT</span></a>}
+                        {hasIG && <a href={camp.reporte_url_ig} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2, padding: '5px 9px', borderRadius: 8, minWidth: 60, background: '#F7F7F5', border: '0.5px solid #E5E5E2', color: '#555', textDecoration: 'none', transition: 'all .15s' }} onMouseEnter={e => { e.currentTarget.style.background = '#111'; e.currentTarget.style.color = '#fff'; e.currentTarget.style.borderColor = '#111' }} onMouseLeave={e => { e.currentTarget.style.background = '#F7F7F5'; e.currentTarget.style.color = '#555'; e.currentTarget.style.borderColor = '#E5E5E2' }}><span style={{ fontSize: 12 }}>◈</span><span style={{ fontSize: 8, letterSpacing: '.03em' }}>Métricas IG</span></a>}
                       </div>
                     )}
                   </div>
