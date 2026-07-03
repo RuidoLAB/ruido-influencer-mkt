@@ -98,6 +98,14 @@ function ReporteBtn({ url, plataforma }) {
   )
 }
 
+function SpotifyIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/>
+    </svg>
+  )
+}
+
 export default function VistaCliente({ token }) {
   const [camp, setCamp] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -108,10 +116,9 @@ export default function VistaCliente({ token }) {
   async function fetchPublicCamp(t) {
     setLoading(true)
     try {
-      // Primero traer datos de la campaña
       const campData = await sql`
         SELECT
-          nombre AS camp_nombre, cliente, plataforma,
+          id, nombre AS camp_nombre, cliente, plataforma,
           reporte_url_tt, reporte_url_ig,
           tipo, contenidos_count, views_logradas,
           artista, cancion
@@ -128,8 +135,29 @@ export default function VistaCliente({ token }) {
 
       const campInfo = campData[0]
       const isEspecial = campInfo.tipo === 'Nano Blast' || campInfo.tipo === 'Clipping'
+      const isPlaylisting = campInfo.tipo === 'Playlisting'
 
-      // Para campañas especiales no cargamos influencers
+      if (isPlaylisting) {
+        const playlists = await sql`
+          SELECT nombre, link FROM campaign_playlists
+          WHERE campaign_id = ${campInfo.id}
+          ORDER BY created_at ASC
+        `
+        setCamp({
+          nombre: campInfo.camp_nombre,
+          cliente: campInfo.cliente,
+          plataforma: campInfo.plataforma || 'Spotify',
+          reporte_url_tt: '', reporte_url_ig: '',
+          tipo: 'Playlisting',
+          artista: campInfo.artista || '',
+          cancion: campInfo.cancion || '',
+          playlists,
+          influencers: [],
+        })
+        setLoading(false)
+        return
+      }
+
       if (isEspecial) {
         setCamp({
           nombre: campInfo.camp_nombre,
@@ -148,7 +176,7 @@ export default function VistaCliente({ token }) {
         return
       }
 
-      // Campaña estándar — cargar influencers
+      // Estándar — cargar influencers
       const rows = await sql`
         SELECT
           c.nombre AS camp_nombre, c.cliente, c.plataforma,
@@ -158,7 +186,7 @@ export default function VistaCliente({ token }) {
           i.nombre,
           i.ig_usuario, i.ig_seguidores, i.ig_link,
           i.tt_usuario, i.tt_seguidores, i.tt_link,
-          i.tipos_contenido, i.avatar_url,
+          i.tipos_contenido,
           ci.video_link_tt, ci.video_link_ig,
           ci.boostcode
         FROM campaigns c
@@ -212,13 +240,13 @@ export default function VistaCliente({ token }) {
   const showBoth = plat === 'Ambas'
   const isNanoBlast = camp.tipo === 'Nano Blast'
   const isClipping = camp.tipo === 'Clipping'
-  const isEspecial = isNanoBlast || isClipping
+  const isPlaylisting = camp.tipo === 'Playlisting'
+  const isEspecial = isNanoBlast || isClipping || isPlaylisting
 
   const hasReporteTT = showTT && camp.reporte_url_tt
   const hasReporteIG = showIG && camp.reporte_url_ig
   const hasAnyReporte = hasReporteTT || hasReporteIG
 
-  // Para estándar
   const totalIG = camp.influencers.reduce((s, i) => s + Number(i.ig_seguidores), 0)
   const totalTT = camp.influencers.reduce((s, i) => s + Number(i.tt_seguidores), 0)
   const totalSeg = (showIG ? totalIG : 0) + (showTT ? totalTT : 0)
@@ -243,7 +271,7 @@ export default function VistaCliente({ token }) {
 
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, marginBottom: 16 }}>
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
               <h1 style={{ fontSize: 22, fontWeight: 500, color: '#fff' }}>{camp.nombre}</h1>
               {isEspecial && (
                 <span style={{ fontSize: 11, padding: '2px 9px', borderRadius: 20, background: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.7)' }}>
@@ -254,7 +282,7 @@ export default function VistaCliente({ token }) {
             <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)' }}>
               {camp.cliente}
               {camp.artista && <span> · {camp.artista}{camp.cancion ? ` — "${camp.cancion}"` : ''}</span>}
-              {plat !== 'Ambas' && <span style={{ marginLeft: 8, background: 'rgba(255,255,255,0.1)', padding: '1px 8px', borderRadius: 20, fontSize: 11 }}>{plat}</span>}
+              {!isPlaylisting && plat !== 'Ambas' && <span style={{ marginLeft: 8, background: 'rgba(255,255,255,0.1)', padding: '1px 8px', borderRadius: 20, fontSize: 11 }}>{plat}</span>}
             </p>
           </div>
           {hasAnyReporte && (
@@ -265,8 +293,14 @@ export default function VistaCliente({ token }) {
           )}
         </div>
 
-        {/* Stats en header */}
+        {/* Stats */}
         <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+          {isPlaylisting && (
+            <div>
+              <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 4 }}>Playlists</div>
+              <div style={{ fontSize: 26, fontWeight: 500, color: '#fff' }}>{camp.playlists?.length || 0}</div>
+            </div>
+          )}
           {isNanoBlast && (
             <div>
               <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 4 }}>Contenidos publicados</div>
@@ -310,8 +344,48 @@ export default function VistaCliente({ token }) {
 
       <div style={{ padding: '28px 40px' }}>
 
-        {/* Vista especial Nano Blast / Clipping — sin tabla de influencers */}
-        {isEspecial && (
+        {/* Vista Playlisting */}
+        {isPlaylisting && (
+          <div style={{ background: '#fff', border: '0.5px solid #E5E5E2', borderRadius: 12, overflow: 'hidden' }}>
+            {(!camp.playlists || camp.playlists.length === 0) ? (
+              <div style={{ padding: 48, textAlign: 'center', color: '#AAA', fontSize: 13 }}>
+                Las playlists estarán disponibles próximamente.
+              </div>
+            ) : (
+              camp.playlists.map((pl, i) => (
+                <div key={i} style={{
+                  display: 'flex', alignItems: 'center', gap: 14, padding: '14px 20px',
+                  borderBottom: i < camp.playlists.length - 1 ? '0.5px solid #F0F0EE' : 'none',
+                }}>
+                  {/* Ícono Spotify */}
+                  <div style={{ width: 40, height: 40, borderRadius: 10, background: '#1DB954', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: '#fff' }}>
+                    <SpotifyIcon />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 2 }}>{pl.nombre}</div>
+                    <div style={{ fontSize: 11.5, color: '#AAA' }}>Spotify Playlist</div>
+                  </div>
+                  <a href={pl.link} target="_blank" rel="noopener noreferrer"
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 6,
+                      padding: '8px 16px', borderRadius: 8,
+                      background: '#1DB954', color: '#fff',
+                      textDecoration: 'none', fontSize: 13, fontWeight: 500,
+                      flexShrink: 0, transition: 'background .15s',
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = '#17a349'}
+                    onMouseLeave={e => e.currentTarget.style.background = '#1DB954'}
+                  >
+                    <SpotifyIcon /> Abrir ↗
+                  </a>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+
+        {/* Vista Nano Blast / Clipping */}
+        {(isNanoBlast || isClipping) && (
           <div style={{ textAlign: 'center', padding: '40px 0', color: '#888', fontSize: 13 }}>
             {hasAnyReporte
               ? 'Usa los botones de métricas en el header para ver el reporte completo de esta campaña.'
@@ -319,7 +393,7 @@ export default function VistaCliente({ token }) {
           </div>
         )}
 
-        {/* Vista estándar — tabla influencers */}
+        {/* Vista Estándar — tabla influencers */}
         {!isEspecial && (
           <div style={{ background: '#fff', border: '0.5px solid #E5E5E2', borderRadius: 12, overflow: 'hidden' }}>
             <div style={{ overflowX: 'auto' }}>
