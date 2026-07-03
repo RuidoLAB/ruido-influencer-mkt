@@ -179,8 +179,53 @@ const EMPTY_CAMP = {
   brief: '', plataforma: 'Ambas', artista: '', cancion: '',
   fecha_inicio: '', fecha_termino: '', reporte_url_tt: '', reporte_url_ig: '',
   tipo: 'Estándar', contenidos_count: '', views_logradas: '',
+  views_min: '', views_max: '',
 }
 const EMPTY_CI_EDIT = { costo: '', piezas: '1', estado: 'Contactado', notas: '', video_link_tt: '', video_link_ig: '', boostcode: '' }
+
+// ─── BARRA DE PROGRESO CLIPPING ───
+function ClippingBar({ logradas, min, max }) {
+  const l = Number(logradas) || 0
+  const mn = Number(min) || 0
+  const mx = Number(max) || 0
+  if (mx === 0) return null
+
+  const pctLogradas = Math.min(100, Math.round((l / mx) * 100))
+  const pctMin = Math.min(100, Math.round((mn / mx) * 100))
+
+  const superaMax = l >= mx
+  const superaMin = l >= mn
+  const barColor = superaMax ? '#3B5BDB' : superaMin ? '#639922' : '#E5E5E2'
+  const barColorActive = superaMax ? '#3B5BDB' : superaMin ? '#639922' : '#AAA'
+
+  let statusText = ''
+  let statusColor = '#AAA'
+  let statusBg = '#F0F0EE'
+  if (superaMax) { statusText = 'Meta superada ✓'; statusColor = '#0C447C'; statusBg = '#E6F1FB' }
+  else if (superaMin) { statusText = 'Dentro del rango ✓'; statusColor = '#27500A'; statusBg = '#EAF3DE' }
+  else if (l > 0) { statusText = 'En progreso'; statusColor = '#633806'; statusBg = '#FAEEDA' }
+
+  return (
+    <div>
+      <div style={{ position: 'relative', height: 8, background: '#E5E5E2', borderRadius: 4, overflow: 'visible', marginBottom: 6 }}>
+        {/* Barra de progreso */}
+        <div style={{ position: 'absolute', left: 0, top: 0, height: '100%', width: pctLogradas + '%', background: barColorActive, borderRadius: 4, transition: 'width .4s ease' }} />
+        {/* Marcador mínimo */}
+        {mn > 0 && (
+          <div style={{ position: 'absolute', left: pctMin + '%', top: -3, width: 2, height: 14, background: '#888', borderRadius: 1, transform: 'translateX(-1px)' }} />
+        )}
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {statusText && (
+            <span style={{ fontSize: 11, background: statusBg, color: statusColor, padding: '2px 8px', borderRadius: 20 }}>{statusText}</span>
+          )}
+        </div>
+        <div style={{ fontSize: 11, color: '#AAA' }}>{pctLogradas}% de {fmtNum(mx)}</div>
+      </div>
+    </div>
+  )
+}
 
 // ─── FORM FIELDS — definido FUERA del componente para evitar re-mount ───
 function CampFormFields({ form, setForm, error, clientsList }) {
@@ -287,20 +332,35 @@ function CampFormFields({ form, setForm, error, clientsList }) {
         </div>
       )}
       {isClipping && (
-        <div className="form-row-2">
-          <div className="fg">
-            <label className="label">Videos publicados</label>
-            <input className="input" type="number" value={form.contenidos_count}
-              onChange={e => setForm(f => ({ ...f, contenidos_count: e.target.value }))}
-              placeholder="Ej: 45" />
+        <>
+          <div className="form-row-2">
+            <div className="fg">
+              <label className="label">Videos publicados</label>
+              <input className="input" type="number" value={form.contenidos_count}
+                onChange={e => setForm(f => ({ ...f, contenidos_count: e.target.value }))}
+                placeholder="Ej: 45" />
+            </div>
+            <div className="fg">
+              <label className="label">Views logradas</label>
+              <input className="input" type="number" value={form.views_logradas}
+                onChange={e => setForm(f => ({ ...f, views_logradas: e.target.value }))}
+                placeholder="Ej: 2500000" />
+            </div>
           </div>
           <div className="fg">
-            <label className="label">Views logradas</label>
-            <input className="input" type="number" value={form.views_logradas}
-              onChange={e => setForm(f => ({ ...f, views_logradas: e.target.value }))}
-              placeholder="Ej: 2500000" />
+            <label className="label">Rango estimado prometido</label>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <input className="input" type="number" value={form.views_min}
+                onChange={e => setForm(f => ({ ...f, views_min: e.target.value }))}
+                placeholder="Mínimo (ej: 1000000)" style={{ flex: 1 }} />
+              <span style={{ color: '#AAA', fontSize: 13, flexShrink: 0 }}>—</span>
+              <input className="input" type="number" value={form.views_max}
+                onChange={e => setForm(f => ({ ...f, views_max: e.target.value }))}
+                placeholder="Máximo (ej: 3000000)" style={{ flex: 1 }} />
+            </div>
+            <div style={{ fontSize: 11, color: '#AAA', marginTop: 4 }}>Ej: 1,000,000 — 3,000,000 views</div>
           </div>
-        </div>
+        </>
       )}
 
       {!isPlaylisting && (
@@ -444,6 +504,8 @@ export default function Campanas({ initialCamp = null }) {
             tipo: row.tipo || 'Estándar',
             contenidos_count: row.contenidos_count || 0,
             views_logradas: row.views_logradas || 0,
+            views_min: row.views_min || 0,
+            views_max: row.views_max || 0,
             influencers: [],
           }
         }
@@ -510,7 +572,7 @@ export default function Campanas({ initialCamp = null }) {
     setSavingCamp(true)
     try {
       await sql`
-        INSERT INTO campaigns (nombre, cliente, client_id, budget, moneda, brief, plataforma, share_token, artista, cancion, fecha_inicio, fecha_termino, reporte_url_tt, reporte_url_ig, tipo, contenidos_count, views_logradas)
+        INSERT INTO campaigns (nombre, cliente, client_id, budget, moneda, brief, plataforma, share_token, artista, cancion, fecha_inicio, fecha_termino, reporte_url_tt, reporte_url_ig, tipo, contenidos_count, views_logradas, views_min, views_max)
         VALUES (
           ${campForm.nombre},
           ${campForm.client_id ? (clientsList.find(c => c.id === campForm.client_id)?.nombre || '') : campForm.cliente},
@@ -523,7 +585,9 @@ export default function Campanas({ initialCamp = null }) {
           ${campForm.reporte_url_tt || ''}, ${campForm.reporte_url_ig || ''},
           ${campForm.tipo || 'Estándar'},
           ${parseInt(campForm.contenidos_count) || 0},
-          ${parseInt(campForm.views_logradas) || 0}
+          ${parseInt(campForm.views_logradas) || 0},
+          ${parseInt(campForm.views_min) || 0},
+          ${parseInt(campForm.views_max) || 0}
         )
       `
       setModalNewCamp(false)
@@ -551,6 +615,8 @@ export default function Campanas({ initialCamp = null }) {
       tipo: currentCamp.tipo || 'Estándar',
       contenidos_count: currentCamp.contenidos_count || '',
       views_logradas: currentCamp.views_logradas || '',
+      views_min: currentCamp.views_min || '',
+      views_max: currentCamp.views_max || '',
     })
     setEditCampFormError('')
     setEditCampModal(true)
@@ -580,7 +646,9 @@ export default function Campanas({ initialCamp = null }) {
           reporte_url_ig = ${editCampForm.reporte_url_ig || ''},
           tipo = ${editCampForm.tipo || 'Estándar'},
           contenidos_count = ${parseInt(editCampForm.contenidos_count) || 0},
-          views_logradas = ${parseInt(editCampForm.views_logradas) || 0}
+          views_logradas = ${parseInt(editCampForm.views_logradas) || 0},
+          views_min = ${parseInt(editCampForm.views_min) || 0},
+          views_max = ${parseInt(editCampForm.views_max) || 0}
         WHERE id = ${currentCamp.id}
       `
       setEditCampModal(false)
@@ -887,13 +955,25 @@ export default function Campanas({ initialCamp = null }) {
             )}
             {currentCamp.tipo === 'Clipping' && (
               <>
-                <div style={{ background: '#F7F7F5', border: '0.5px solid #E5E5E2', borderRadius: 12, padding: '14px 20px', flex: 1 }}>
+                <div style={{ background: '#F7F7F5', border: '0.5px solid #E5E5E2', borderRadius: 12, padding: '14px 20px', flex: '0 0 auto' }}>
                   <div style={{ fontSize: 10.5, color: '#AAA', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 4 }}>Videos publicados</div>
                   <div style={{ fontSize: 28, fontWeight: 500 }}>{fmtNum(currentCamp.contenidos_count)}</div>
                 </div>
                 <div style={{ background: '#F7F7F5', border: '0.5px solid #E5E5E2', borderRadius: 12, padding: '14px 20px', flex: 1 }}>
-                  <div style={{ fontSize: 10.5, color: '#AAA', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 4 }}>Views logradas</div>
-                  <div style={{ fontSize: 28, fontWeight: 500 }}>{fmtNum(currentCamp.views_logradas)}</div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+                    <div>
+                      <div style={{ fontSize: 10.5, color: '#AAA', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 4 }}>Views logradas</div>
+                      <div style={{ fontSize: 28, fontWeight: 500 }}>{fmtNum(currentCamp.views_logradas)}</div>
+                    </div>
+                    {currentCamp.views_min > 0 && currentCamp.views_max > 0 && (
+                      <div style={{ fontSize: 11, color: '#AAA', textAlign: 'right', marginTop: 2 }}>
+                        Meta: {fmtNum(currentCamp.views_min)} — {fmtNum(currentCamp.views_max)}
+                      </div>
+                    )}
+                  </div>
+                  {currentCamp.views_max > 0 && (
+                    <ClippingBar logradas={currentCamp.views_logradas} min={currentCamp.views_min} max={currentCamp.views_max} />
+                  )}
                 </div>
               </>
             )}
