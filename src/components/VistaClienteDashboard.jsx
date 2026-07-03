@@ -122,6 +122,50 @@ function SpotifyIcon() {
   )
 }
 
+function ClippingBar({ logradas, min, max, dark = false }) {
+  const l = Number(logradas) || 0
+  const mn = Number(min) || 0
+  const mx = Number(max) || 0
+  if (mx === 0) return null
+  const pctLogradas = Math.min(100, Math.round((l / mx) * 100))
+  const pctMin = mn > 0 ? Math.min(100, Math.round((mn / mx) * 100)) : 0
+  const superaMax = l >= mx
+  const superaMin = l >= mn && mn > 0
+  const barColor = superaMax ? '#3B5BDB' : superaMin ? '#639922' : '#AAA'
+
+  let statusText = '', statusColor = '', statusBg = ''
+  if (dark) {
+    if (superaMax) { statusText = 'Meta superada ✓'; statusColor = '#fff'; statusBg = 'rgba(59,91,219,0.25)' }
+    else if (superaMin) { statusText = 'Dentro del rango ✓'; statusColor = '#fff'; statusBg = 'rgba(99,153,34,0.25)' }
+    else if (l > 0) { statusText = 'En progreso'; statusColor = 'rgba(255,255,255,0.6)'; statusBg = 'rgba(255,255,255,0.1)' }
+  } else {
+    if (superaMax) { statusText = 'Meta superada ✓'; statusColor = '#0C447C'; statusBg = '#E6F1FB' }
+    else if (superaMin) { statusText = 'Dentro del rango ✓'; statusColor = '#27500A'; statusBg = '#EAF3DE' }
+    else if (l > 0) { statusText = 'En progreso'; statusColor = '#633806'; statusBg = '#FAEEDA' }
+  }
+
+  const trackBg = dark ? 'rgba(255,255,255,0.15)' : '#E5E5E2'
+  const markerBg = dark ? 'rgba(255,255,255,0.5)' : '#888'
+
+  return (
+    <div style={{ marginTop: 10 }}>
+      <div style={{ position: 'relative', height: 7, background: trackBg, borderRadius: 4, overflow: 'visible', marginBottom: 7 }}>
+        <div style={{ position: 'absolute', left: 0, top: 0, height: '100%', width: pctLogradas + '%', background: barColor, borderRadius: 4, transition: 'width .4s ease' }} />
+        {mn > 0 && (
+          <div style={{ position: 'absolute', left: pctMin + '%', top: -3, width: 2, height: 13, background: markerBg, borderRadius: 1, transform: 'translateX(-1px)' }} />
+        )}
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        {statusText
+          ? <span style={{ fontSize: 11, background: statusBg, color: statusColor, padding: '2px 8px', borderRadius: 20 }}>{statusText}</span>
+          : <span />
+        }
+        <span style={{ fontSize: 11, color: dark ? 'rgba(255,255,255,0.4)' : '#AAA' }}>{pctLogradas}% de {fmtNum(mx)}</span>
+      </div>
+    </div>
+  )
+}
+
 export default function VistaClienteDashboard({ token }) {
   const isMobile = useIsMobile()
   const [data, setData] = useState(null)
@@ -159,7 +203,7 @@ export default function VistaClienteDashboard({ token }) {
           c.id, c.nombre, c.artista, c.cancion, c.estado,
           c.fecha_inicio, c.fecha_termino, c.plataforma,
           c.reporte_url_tt, c.reporte_url_ig,
-          c.tipo, c.contenidos_count, c.views_logradas,
+          c.tipo, c.contenidos_count, c.views_logradas, c.views_min, c.views_max,
           c.created_at,
           COUNT(DISTINCT ci.id) AS total_influencers,
           COUNT(DISTINCT CASE WHEN ci.video_link_tt != '' OR ci.video_link_ig != '' THEN ci.id END) AS videos_publicados,
@@ -318,9 +362,21 @@ export default function VistaClienteDashboard({ token }) {
                   <div style={{ fontSize: 9.5, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 3 }}>Videos publicados</div>
                   <div style={{ fontSize: isMobile ? 18 : 22, fontWeight: 500, color: '#fff' }}>{fmtNum(selectedCamp.contenidos_count)}</div>
                 </div>
-                <div>
-                  <div style={{ fontSize: 9.5, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 3 }}>Views logradas</div>
-                  <div style={{ fontSize: isMobile ? 18 : 22, fontWeight: 500, color: '#fff' }}>{fmtNum(selectedCamp.views_logradas)}</div>
+                <div style={{ flex: 1, minWidth: isMobile ? '100%' : 200 }}>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
+                    <div>
+                      <div style={{ fontSize: 9.5, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 3 }}>Views logradas</div>
+                      <div style={{ fontSize: isMobile ? 18 : 22, fontWeight: 500, color: '#fff' }}>{fmtNum(selectedCamp.views_logradas)}</div>
+                    </div>
+                    {selectedCamp.views_min > 0 && selectedCamp.views_max > 0 && (
+                      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', paddingBottom: 2 }}>
+                        meta {fmtNum(selectedCamp.views_min)} — {fmtNum(selectedCamp.views_max)}
+                      </div>
+                    )}
+                  </div>
+                  {selectedCamp.views_max > 0 && (
+                    <ClippingBar logradas={selectedCamp.views_logradas} min={selectedCamp.views_min} max={selectedCamp.views_max} dark={true} />
+                  )}
                 </div>
               </>
             )}
