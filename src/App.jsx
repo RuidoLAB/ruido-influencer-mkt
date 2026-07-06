@@ -11,7 +11,20 @@ import VistaReporte from './components/VistaReporte'
 import VistaClienteDashboard from './components/VistaClienteDashboard'
 import './index.css'
 
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(
+    typeof window !== 'undefined' ? window.innerWidth < 720 : false
+  )
+  useEffect(() => {
+    function onResize() { setIsMobile(window.innerWidth < 720) }
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+  return isMobile
+}
+
 export default function App() {
+  const isMobile = useIsMobile()
   const [auth, setAuth] = useState(false)
   const [page, setPage] = useState('dashboard')
   const [publicToken, setPublicToken] = useState(null)
@@ -47,7 +60,12 @@ export default function App() {
     setPage('campanas')
   }
 
-  // Vistas públicas — sin login
+  function handleSetPage(p) {
+    setSelectedClient(null)
+    setCampanaFromClient(null)
+    setPage(p)
+  }
+
   if (publicToken) return <VistaCliente token={publicToken} />
   if (reportToken) return <VistaReporte token={reportToken} />
   if (clientDashboardToken) return <VistaClienteDashboard token={clientDashboardToken} />
@@ -56,18 +74,12 @@ export default function App() {
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: '#F7F7F5' }}>
-      <Sidebar page={page} setPage={(p) => {
-        setSelectedClient(null)
-        setCampanaFromClient(null)
-        setPage(p)
-      }} onLogout={handleLogout} />
-      <main style={{ flex: 1, minWidth: 0 }}>
-        {page === 'dashboard' && <Dashboard onNavigate={setPage} />}
-        {page === 'roster' && <Roster />}
-        {page === 'campanas' && <Campanas initialCamp={campanaFromClient} />}
-        {page === 'clientes' && (
-          <Clientes onSelectCliente={handleSelectCliente} />
-        )}
+      <Sidebar page={page} setPage={handleSetPage} onLogout={handleLogout} />
+      <main style={{ flex: 1, minWidth: 0, paddingBottom: isMobile ? 'calc(56px + env(safe-area-inset-bottom))' : 0 }}>
+        {page === 'dashboard'      && <Dashboard onNavigate={setPage} />}
+        {page === 'roster'         && <Roster />}
+        {page === 'campanas'       && <Campanas initialCamp={campanaFromClient} />}
+        {page === 'clientes'       && <Clientes onSelectCliente={handleSelectCliente} />}
         {page === 'cliente-detail' && selectedClient && (
           <ClienteDashboard
             client={selectedClient}
