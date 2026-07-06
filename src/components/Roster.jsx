@@ -49,6 +49,18 @@ function fmtSeg(n) {
   return n.toLocaleString('es-CL')
 }
 
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(
+    typeof window !== 'undefined' ? window.innerWidth < 720 : false
+  )
+  useEffect(() => {
+    function onResize() { setIsMobile(window.innerWidth < 720) }
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+  return isMobile
+}
+
 function Avatar({ nombre, index, size = 32 }) {
   const c = AV_COLORS[index % AV_COLORS.length]
   return (
@@ -76,11 +88,12 @@ function UserLink({ username, link }) {
   return <span style={{ fontSize: 12.5, color: '#555' }}>{username}</span>
 }
 
-function TiposBadges({ tipos }) {
+function TiposBadges({ tipos, max }) {
   if (!tipos || tipos.length === 0) return <span style={{ color: '#CCC', fontSize: 11 }}>—</span>
+  const shown = max ? tipos.slice(0, max) : tipos
   return (
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
-      {tipos.map(t => {
+      {shown.map(t => {
         const c = TIPO_COLORS[t] || TIPO_COLORS['Otros']
         return (
           <span key={t} style={{ background: c.bg, color: c.color, padding: '1px 7px', borderRadius: 20, fontSize: 10.5 }}>
@@ -88,6 +101,9 @@ function TiposBadges({ tipos }) {
           </span>
         )
       })}
+      {max && tipos.length > max && (
+        <span style={{ fontSize: 10.5, color: '#AAA' }}>+{tipos.length - max}</span>
+      )}
     </div>
   )
 }
@@ -99,18 +115,18 @@ function TiposCheckboxes({ selected, onChange }) {
         const isSelected = selected.includes(t)
         const c = TIPO_COLORS[t] || TIPO_COLORS['Otros']
         return (
-          <div
-            key={t}
+          <div key={t}
             onClick={() => {
               if (isSelected) onChange(selected.filter(x => x !== t))
               else onChange([...selected, t])
             }}
             style={{
-              padding: '4px 10px', borderRadius: 20, fontSize: 12, cursor: 'pointer',
+              padding: '5px 12px', borderRadius: 20, fontSize: 12.5, cursor: 'pointer',
               background: isSelected ? c.bg : '#F7F7F5',
               color: isSelected ? c.color : '#888',
               border: `0.5px solid ${isSelected ? c.color + '44' : '#E5E5E2'}`,
               transition: 'all .12s', userSelect: 'none',
+              minHeight: 32, display: 'flex', alignItems: 'center',
             }}
           >
             {isSelected ? '✓ ' : ''}{t}
@@ -139,6 +155,7 @@ function getDuplicateMessage(errorMsg) {
 }
 
 export default function Roster() {
+  const isMobile = useIsMobile()
   const [influencers, setInfluencers] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -146,6 +163,7 @@ export default function Roster() {
   const [filterSize, setFilterSize] = useState('')
   const [filterEstado, setFilterEstado] = useState('')
   const [sortAsc, setSortAsc] = useState(false)
+  const [filtersOpen, setFiltersOpen] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
   const [form, setForm] = useState(EMPTY)
   const [editId, setEditId] = useState(null)
@@ -233,11 +251,8 @@ export default function Roster() {
       await fetchInfluencers()
     } catch (e) {
       const dupMsg = getDuplicateMessage(e.message)
-      if (dupMsg) {
-        setDuplicateError(dupMsg)
-      } else {
-        console.error(e)
-      }
+      if (dupMsg) setDuplicateError(dupMsg)
+      else console.error(e)
     }
     setSaving(false)
   }
@@ -271,58 +286,196 @@ export default function Roster() {
       return sortAsc ? -diff : diff
     })
 
+  const activeFiltersCount = [filterTipo, filterSize, filterEstado].filter(Boolean).length
+
   return (
-    <div style={{ padding: '20px 24px' }}>
+    <div style={{ padding: isMobile ? '16px' : '20px 24px' }}>
 
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
         <div>
-          <h1 style={{ fontSize: 20, fontWeight: 500 }}>Roster</h1>
+          <h1 style={{ fontSize: isMobile ? 18 : 20, fontWeight: 500 }}>Roster</h1>
           <p style={{ fontSize: 12, color: '#888', marginTop: 2 }}>
             {influencers.length} influencers · {influencers.filter(i => i.estado === 'Activo').length} activos
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <ImportarCSV onDone={fetchInfluencers} />
-          <button className="btn-red" onClick={openNew}>+ Nuevo influencer</button>
+          {!isMobile && <ImportarCSV onDone={fetchInfluencers} />}
+          <button className="btn-red" onClick={openNew} style={{ fontSize: isMobile ? 13 : 14, padding: isMobile ? '7px 12px' : undefined }}>
+            {isMobile ? '+ Nuevo' : '+ Nuevo influencer'}
+          </button>
         </div>
       </div>
 
       {/* Toolbar */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
-        <input
-          className="input"
-          placeholder="Buscar nombre o usuario..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          style={{ minWidth: 220, flex: 1, maxWidth: 300 }}
-        />
-        <select className="input" value={filterTipo} onChange={e => setFilterTipo(e.target.value)}>
-          <option value="">Todos los tipos</option>
-          {TIPOS.map(t => <option key={t}>{t}</option>)}
-        </select>
-        <select className="input" value={filterSize} onChange={e => setFilterSize(e.target.value)}>
-          <option value="">Todos los tamaños</option>
-          {SIZE_RANGES.map(s => <option key={s.label}>{s.label}</option>)}
-        </select>
-        <select className="input" value={filterEstado} onChange={e => setFilterEstado(e.target.value)}>
-          <option value="">Todos los estados</option>
-          <option>Activo</option>
-          <option>Inactivo</option>
-        </select>
-      </div>
-
-      {/* Tabla */}
-      <div className="card" style={{ overflow: 'hidden' }}>
-        {loading ? (
-          <div style={{ padding: 40, textAlign: 'center', color: '#AAA', fontSize: 13 }}>Cargando...</div>
-        ) : filtered.length === 0 ? (
-          <div style={{ padding: 40, textAlign: 'center', color: '#AAA', fontSize: 13 }}>
-            {search || filterTipo || filterEstado || filterSize
-              ? 'Sin resultados para ese filtro'
-              : 'Aún no hay influencers. Agrega el primero o importa un CSV.'}
+      {isMobile ? (
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input className="input" placeholder="Buscar nombre o usuario..."
+              value={search} onChange={e => setSearch(e.target.value)}
+              style={{ flex: 1, minHeight: 42, fontSize: 14 }} />
+            <button
+              onClick={() => setFiltersOpen(o => !o)}
+              style={{
+                minHeight: 42, minWidth: 42, borderRadius: 8,
+                border: '0.5px solid #E5E5E2',
+                background: activeFiltersCount > 0 ? '#FCEBEB' : '#fff',
+                color: activeFiltersCount > 0 ? '#A32D2D' : '#555',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 16, position: 'relative', flexShrink: 0,
+              }}
+            >
+              ⚙
+              {activeFiltersCount > 0 && (
+                <span style={{
+                  position: 'absolute', top: -4, right: -4,
+                  width: 16, height: 16, borderRadius: '50%',
+                  background: '#E8313A', color: '#fff',
+                  fontSize: 9, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>{activeFiltersCount}</span>
+              )}
+            </button>
           </div>
-        ) : (
+          {filtersOpen && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8, background: '#fff', border: '0.5px solid #E5E5E2', borderRadius: 10, padding: 12 }}>
+              <select className="input" value={filterTipo} onChange={e => setFilterTipo(e.target.value)} style={{ minHeight: 42 }}>
+                <option value="">Todos los tipos</option>
+                {TIPOS.map(t => <option key={t}>{t}</option>)}
+              </select>
+              <select className="input" value={filterSize} onChange={e => setFilterSize(e.target.value)} style={{ minHeight: 42 }}>
+                <option value="">Todos los tamaños</option>
+                {SIZE_RANGES.map(s => <option key={s.label}>{s.label}</option>)}
+              </select>
+              <select className="input" value={filterEstado} onChange={e => setFilterEstado(e.target.value)} style={{ minHeight: 42 }}>
+                <option value="">Todos los estados</option>
+                <option>Activo</option>
+                <option>Inactivo</option>
+              </select>
+              <select className="input" value={sortAsc ? 'asc' : 'desc'} onChange={e => setSortAsc(e.target.value === 'asc')} style={{ minHeight: 42 }}>
+                <option value="desc">Mayor alcance primero</option>
+                <option value="asc">Menor alcance primero</option>
+              </select>
+              {activeFiltersCount > 0 && (
+                <button className="btn-ghost" style={{ minHeight: 40 }} onClick={() => { setFilterTipo(''); setFilterSize(''); setFilterEstado('') }}>
+                  Limpiar filtros
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      ) : (
+        <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
+          <input className="input" placeholder="Buscar nombre o usuario..."
+            value={search} onChange={e => setSearch(e.target.value)}
+            style={{ minWidth: 220, flex: 1, maxWidth: 300 }} />
+          <select className="input" value={filterTipo} onChange={e => setFilterTipo(e.target.value)}>
+            <option value="">Todos los tipos</option>
+            {TIPOS.map(t => <option key={t}>{t}</option>)}
+          </select>
+          <select className="input" value={filterSize} onChange={e => setFilterSize(e.target.value)}>
+            <option value="">Todos los tamaños</option>
+            {SIZE_RANGES.map(s => <option key={s.label}>{s.label}</option>)}
+          </select>
+          <select className="input" value={filterEstado} onChange={e => setFilterEstado(e.target.value)}>
+            <option value="">Todos los estados</option>
+            <option>Activo</option>
+            <option>Inactivo</option>
+          </select>
+        </div>
+      )}
+
+      {/* Contenido */}
+      {loading ? (
+        <div style={{ padding: 40, textAlign: 'center', color: '#AAA', fontSize: 13 }}>Cargando...</div>
+      ) : filtered.length === 0 ? (
+        <div style={{ padding: 40, textAlign: 'center', color: '#AAA', fontSize: 13 }}>
+          {search || filterTipo || filterEstado || filterSize
+            ? 'Sin resultados para ese filtro'
+            : 'Aún no hay influencers. Agrega el primero.'}
+        </div>
+      ) : isMobile ? (
+        // ─── VISTA MOBILE: tarjetas ───
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {filtered.map((inf, i) => {
+            const igSize = getSize(inf.ig_seguidores)
+            const ttSize = getSize(inf.tt_seguidores)
+            const tipos = inf.tipos_contenido || []
+            const isActivo = inf.estado === 'Activo'
+            return (
+              <div key={inf.id} style={{
+                background: '#fff', border: '0.5px solid #E5E5E2', borderRadius: 12,
+                padding: '14px', opacity: isActivo ? 1 : 0.65,
+              }}>
+                {/* Fila superior: avatar + nombre + estado + acciones */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                  <Avatar nombre={inf.nombre} index={i} size={40} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 14.5, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{inf.nombre}</div>
+                    <span style={{
+                      fontSize: 10.5,
+                      background: isActivo ? '#EAF3DE' : '#F1EFE8',
+                      color: isActivo ? '#27500A' : '#5F5E5A',
+                      padding: '1px 7px', borderRadius: 20,
+                    }}>{inf.estado}</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                    <button
+                      onClick={() => openEdit(inf)}
+                      style={{ width: 36, height: 36, borderRadius: 8, border: '0.5px solid #E5E5E2', background: '#F7F7F5', color: '#555', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                    >✎</button>
+                    <button
+                      onClick={() => setDeleteId(inf.id)}
+                      style={{ width: 36, height: 36, borderRadius: 8, border: '0.5px solid #FDDADA', background: '#FEF9F9', color: '#C0392B', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                    >✕</button>
+                  </div>
+                </div>
+
+                {/* Seguidores */}
+                <div style={{ display: 'flex', gap: 12, marginBottom: 10 }}>
+                  {inf.ig_seguidores > 0 && (
+                    <div style={{ flex: 1, background: '#F7F7F5', borderRadius: 8, padding: '8px 10px' }}>
+                      <div style={{ fontSize: 10, color: '#AAA', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 3 }}>Instagram</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                        {inf.ig_link
+                          ? <a href={inf.ig_link} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, fontWeight: 500, color: '#E8313A', textDecoration: 'none' }}>
+                              {inf.ig_usuario || fmtSeg(inf.ig_seguidores)} ↗
+                            </a>
+                          : <span style={{ fontSize: 13, fontWeight: 500, color: '#1A1A1A' }}>{inf.ig_usuario || '—'}</span>
+                        }
+                        <span style={{ background: igSize.bg, color: igSize.color, padding: '0 5px', borderRadius: 10, fontSize: 10 }}>{igSize.label}</span>
+                      </div>
+                      <div style={{ fontSize: 11, color: '#AAA', marginTop: 1 }}>{fmtSeg(inf.ig_seguidores)}</div>
+                    </div>
+                  )}
+                  {inf.tt_seguidores > 0 && (
+                    <div style={{ flex: 1, background: '#F7F7F5', borderRadius: 8, padding: '8px 10px' }}>
+                      <div style={{ fontSize: 10, color: '#AAA', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 3 }}>TikTok</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                        {inf.tt_link
+                          ? <a href={inf.tt_link} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, fontWeight: 500, color: '#E8313A', textDecoration: 'none' }}>
+                              {inf.tt_usuario || fmtSeg(inf.tt_seguidores)} ↗
+                            </a>
+                          : <span style={{ fontSize: 13, fontWeight: 500, color: '#1A1A1A' }}>{inf.tt_usuario || '—'}</span>
+                        }
+                        <span style={{ background: ttSize.bg, color: ttSize.color, padding: '0 5px', borderRadius: 10, fontSize: 10 }}>{ttSize.label}</span>
+                      </div>
+                      <div style={{ fontSize: 11, color: '#AAA', marginTop: 1 }}>{fmtSeg(inf.tt_seguidores)}</div>
+                    </div>
+                  )}
+                  {inf.ig_seguidores === 0 && inf.tt_seguidores === 0 && (
+                    <div style={{ fontSize: 12, color: '#CCC' }}>Sin datos de seguidores</div>
+                  )}
+                </div>
+
+                {/* Categorías */}
+                <TiposBadges tipos={tipos} max={4} />
+              </div>
+            )
+          })}
+        </div>
+      ) : (
+        // ─── VISTA DESKTOP: tabla ───
+        <div className="card" style={{ overflow: 'hidden' }}>
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
               <thead>
@@ -356,9 +509,7 @@ export default function Roster() {
                         {inf.ig_seguidores > 0 && (
                           <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 3 }}>
                             <span style={{ fontSize: 11, color: '#AAA' }}>{fmtSeg(inf.ig_seguidores)}</span>
-                            <span style={{ background: igSize.bg, color: igSize.color, padding: '0 6px', borderRadius: 20, fontSize: 10 }}>
-                              {igSize.label}
-                            </span>
+                            <span style={{ background: igSize.bg, color: igSize.color, padding: '0 6px', borderRadius: 20, fontSize: 10 }}>{igSize.label}</span>
                           </div>
                         )}
                       </td>
@@ -367,9 +518,7 @@ export default function Roster() {
                         {inf.tt_seguidores > 0 && (
                           <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 3 }}>
                             <span style={{ fontSize: 11, color: '#AAA' }}>{fmtSeg(inf.tt_seguidores)}</span>
-                            <span style={{ background: ttSize.bg, color: ttSize.color, padding: '0 6px', borderRadius: 20, fontSize: 10 }}>
-                              {ttSize.label}
-                            </span>
+                            <span style={{ background: ttSize.bg, color: ttSize.color, padding: '0 6px', borderRadius: 20, fontSize: 10 }}>{ttSize.label}</span>
                           </div>
                         )}
                       </td>
@@ -400,8 +549,8 @@ export default function Roster() {
               </tbody>
             </table>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Modal crear/editar */}
       <Modal open={modalOpen} onClose={() => { setModalOpen(false); setDuplicateError(null) }} title={editId ? 'Editar influencer' : 'Nuevo influencer'}>
@@ -409,48 +558,66 @@ export default function Roster() {
           <label className="label">Nombre</label>
           <input className="input" value={form.nombre}
             onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))}
-            placeholder="Nombre completo" />
+            placeholder="Nombre completo"
+            style={{ fontSize: isMobile ? 16 : 14 }} />
         </div>
-        <div className="form-row-2">
-          <div className="fg">
-            <label className="label">Usuario Instagram</label>
-            <input className="input" value={form.ig_usuario}
-              onChange={e => { setForm(f => ({ ...f, ig_usuario: e.target.value })); setDuplicateError(null) }}
-              placeholder="@usuario" />
+
+        {/* Instagram */}
+        <div style={{ background: '#F7F7F5', border: '0.5px solid #E5E5E2', borderRadius: 10, padding: '12px 14px', marginBottom: 8 }}>
+          <div style={{ fontSize: 11, color: '#AAA', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 10 }}>Instagram</div>
+          <div className="form-row-2">
+            <div className="fg">
+              <label className="label">Usuario</label>
+              <input className="input" value={form.ig_usuario}
+                onChange={e => { setForm(f => ({ ...f, ig_usuario: e.target.value })); setDuplicateError(null) }}
+                placeholder="@usuario"
+                style={{ fontSize: isMobile ? 16 : 14 }} />
+            </div>
+            <div className="fg">
+              <label className="label">Seguidores</label>
+              <input className="input" type="number" value={form.ig_seguidores}
+                onChange={e => setForm(f => ({ ...f, ig_seguidores: e.target.value }))}
+                placeholder="0"
+                style={{ fontSize: isMobile ? 16 : 14 }} />
+            </div>
           </div>
           <div className="fg">
-            <label className="label">Seguidores Instagram</label>
-            <input className="input" type="number" value={form.ig_seguidores}
-              onChange={e => setForm(f => ({ ...f, ig_seguidores: e.target.value }))}
-              placeholder="0" />
+            <label className="label">Link de perfil</label>
+            <input className="input" value={form.ig_link}
+              onChange={e => setForm(f => ({ ...f, ig_link: e.target.value }))}
+              placeholder="https://instagram.com/usuario"
+              style={{ fontSize: isMobile ? 16 : 14 }} />
           </div>
         </div>
-        <div className="fg">
-          <label className="label">Link Instagram</label>
-          <input className="input" value={form.ig_link}
-            onChange={e => setForm(f => ({ ...f, ig_link: e.target.value }))}
-            placeholder="https://instagram.com/usuario" />
-        </div>
-        <div className="form-row-2">
+
+        {/* TikTok */}
+        <div style={{ background: '#F7F7F5', border: '0.5px solid #E5E5E2', borderRadius: 10, padding: '12px 14px', marginBottom: 8 }}>
+          <div style={{ fontSize: 11, color: '#AAA', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 10 }}>TikTok</div>
+          <div className="form-row-2">
+            <div className="fg">
+              <label className="label">Usuario</label>
+              <input className="input" value={form.tt_usuario}
+                onChange={e => { setForm(f => ({ ...f, tt_usuario: e.target.value })); setDuplicateError(null) }}
+                placeholder="@usuario"
+                style={{ fontSize: isMobile ? 16 : 14 }} />
+            </div>
+            <div className="fg">
+              <label className="label">Seguidores</label>
+              <input className="input" type="number" value={form.tt_seguidores}
+                onChange={e => setForm(f => ({ ...f, tt_seguidores: e.target.value }))}
+                placeholder="0"
+                style={{ fontSize: isMobile ? 16 : 14 }} />
+            </div>
+          </div>
           <div className="fg">
-            <label className="label">Usuario TikTok</label>
-            <input className="input" value={form.tt_usuario}
-              onChange={e => { setForm(f => ({ ...f, tt_usuario: e.target.value })); setDuplicateError(null) }}
-              placeholder="@usuario" />
-          </div>
-          <div className="fg">
-            <label className="label">Seguidores TikTok</label>
-            <input className="input" type="number" value={form.tt_seguidores}
-              onChange={e => setForm(f => ({ ...f, tt_seguidores: e.target.value }))}
-              placeholder="0" />
+            <label className="label">Link de perfil</label>
+            <input className="input" value={form.tt_link}
+              onChange={e => setForm(f => ({ ...f, tt_link: e.target.value }))}
+              placeholder="https://tiktok.com/@usuario"
+              style={{ fontSize: isMobile ? 16 : 14 }} />
           </div>
         </div>
-        <div className="fg">
-          <label className="label">Link TikTok</label>
-          <input className="input" value={form.tt_link}
-            onChange={e => setForm(f => ({ ...f, tt_link: e.target.value }))}
-            placeholder="https://tiktok.com/@usuario" />
-        </div>
+
         <div className="fg">
           <label className="label">Categorías de contenido</label>
           <TiposCheckboxes
@@ -464,7 +631,8 @@ export default function Roster() {
         <div className="fg">
           <label className="label">Estado</label>
           <select className="input" value={form.estado}
-            onChange={e => setForm(f => ({ ...f, estado: e.target.value }))}>
+            onChange={e => setForm(f => ({ ...f, estado: e.target.value }))}
+            style={{ fontSize: isMobile ? 16 : 14, minHeight: isMobile ? 44 : 'auto' }}>
             <option>Activo</option>
             <option>Inactivo</option>
           </select>
@@ -474,10 +642,9 @@ export default function Roster() {
           <textarea className="input" rows={2} value={form.notas}
             onChange={e => setForm(f => ({ ...f, notas: e.target.value }))}
             placeholder="Solo visible para el equipo..."
-            style={{ resize: 'vertical' }} />
+            style={{ resize: 'vertical', fontSize: isMobile ? 16 : 14 }} />
         </div>
 
-        {/* Error duplicado */}
         {duplicateError && (
           <div style={{
             background: '#FCEBEB', border: '0.5px solid #F7C1C1',
@@ -491,7 +658,8 @@ export default function Roster() {
 
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
           <button className="btn-ghost" onClick={() => { setModalOpen(false); setDuplicateError(null) }}>Cancelar</button>
-          <button className="btn-red" onClick={handleSave} disabled={saving}>
+          <button className="btn-red" onClick={handleSave} disabled={saving}
+            style={{ minHeight: isMobile ? 44 : 'auto', minWidth: isMobile ? 100 : 'auto' }}>
             {saving ? 'Guardando...' : 'Guardar'}
           </button>
         </div>
