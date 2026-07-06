@@ -5,6 +5,18 @@ import SharePanel from './SharePanel'
 import Reportes from './Reportes'
 import Pagos from './Pagos'
 
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(
+    typeof window !== 'undefined' ? window.innerWidth < 720 : false
+  )
+  useEffect(() => {
+    function onResize() { setIsMobile(window.innerWidth < 720) }
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+  return isMobile
+}
+
 const TIPOS_CONTENIDO = ['Bailes', 'Reviewers', 'Humor', 'Lifestyle', 'Música', 'Gaming', 'Moda', 'Fitness', 'Viajes', 'Otros']
 const TIPOS_CAMPANA = ['Estándar', 'Nano Blast', 'Clipping', 'Playlisting']
 
@@ -124,7 +136,7 @@ function BudgetBar({ usado, total }) {
   )
 }
 
-function BudgetSummary({ camp }) {
+function BudgetSummary({ camp, isMobile }) {
   const usado = camp.influencers?.reduce((s, i) => s + Number(i.costo), 0) || 0
   const restante = camp.budget - usado
   const pct = camp.budget > 0 ? Math.min(100, Math.round((usado / camp.budget) * 100)) : 0
@@ -133,7 +145,7 @@ function BudgetSummary({ camp }) {
   const barColor = pct >= 100 ? '#E24B4A' : pct >= 90 ? '#EF9F27' : '#639922'
   return (
     <div style={{
-      display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12,
+      display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: 12,
       background: '#F7F7F5', borderRadius: 12, padding: '14px 16px', marginBottom: 20,
       border: '0.5px solid #E5E5E2',
     }}>
@@ -409,6 +421,7 @@ function CampFormFields({ form, setForm, error, clientsList }) {
 }
 
 export default function Campanas({ initialCamp = null }) {
+  const isMobile = useIsMobile()
   const [camps, setCamps] = useState([])
   const [loading, setLoading] = useState(true)
   const [currentCamp, setCurrentCamp] = useState(initialCamp)
@@ -874,7 +887,7 @@ export default function Campanas({ initialCamp = null }) {
     )
   }
 
-  if (loading) return <div style={{ padding: 40, color: '#AAA', fontSize: 13 }}>Cargando...</div>
+  if (loading) return <div style={{ padding: isMobile ? 24 : 40, color: '#AAA', fontSize: 13 }}>Cargando...</div>
 
   // ─── VISTA DETALLE ───
   if (currentCamp) {
@@ -885,50 +898,47 @@ export default function Campanas({ initialCamp = null }) {
     const isPlaylisting = currentCamp.tipo === 'Playlisting'
 
     return (
-      <div style={{ padding: '20px 24px' }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20 }}>
-          <div>
-            <div style={{ fontSize: 12, color: '#AAA', cursor: 'pointer', marginBottom: 4 }}
-              onClick={() => { setCurrentCamp(null); setCampTab('influencers') }}>
-              ← Volver a campañas
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-              <h1 style={{ fontSize: 20, fontWeight: 500 }}>{currentCamp.nombre}</h1>
-              <span style={{ fontSize: 11, padding: '2px 9px', borderRadius: 20, background: ec.bg, color: ec.color }}>{currentCamp.estado}</span>
-              {!isPlaylisting && <span style={{ fontSize: 11, padding: '2px 9px', borderRadius: 20, background: '#F0F0EE', color: '#666' }}>{plat}</span>}
-              {currentCamp.tipo !== 'Estándar' && <span style={{ fontSize: 11, padding: '2px 9px', borderRadius: 20, background: '#1A1A1A', color: '#fff' }}>{currentCamp.tipo}</span>}
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
-              {currentCamp.client_nombre && <span style={{ fontSize: 12, color: clientColor, fontWeight: 500 }}>{currentCamp.client_nombre}</span>}
-              {currentCamp.artista && <span style={{ fontSize: 12, color: '#888' }}>· {currentCamp.artista}{currentCamp.cancion ? ` — "${currentCamp.cancion}"` : ''}</span>}
-            </div>
+      <div style={{ padding: isMobile ? '14px 16px' : '20px 24px' }}>
+        {/* Header */}
+        <div style={{ marginBottom: isMobile ? 14 : 20 }}>
+          <div style={{ fontSize: 12, color: '#AAA', cursor: 'pointer', marginBottom: 6 }}
+            onClick={() => { setCurrentCamp(null); setCampTab('influencers') }}>
+            ← Volver a campañas
           </div>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-            {hasReporteTT && (
-              <a href={currentCamp.reporte_url_tt} target="_blank" rel="noopener noreferrer"
-                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8, fontSize: 12.5, background: '#1A1A1A', color: '#fff', textDecoration: 'none' }}
-                onMouseEnter={e => e.currentTarget.style.background = '#333'}
-                onMouseLeave={e => e.currentTarget.style.background = '#1A1A1A'}
-              >
-                <span style={{ fontSize: 11, background: '#F0F0EE', color: '#555', padding: '1px 5px', borderRadius: 4 }}>TT</span>
-                Ver reporte métricas
-              </a>
-            )}
-            {hasReporteIG && (
-              <a href={currentCamp.reporte_url_ig} target="_blank" rel="noopener noreferrer"
-                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8, fontSize: 12.5, background: '#1A1A1A', color: '#fff', textDecoration: 'none' }}
-                onMouseEnter={e => e.currentTarget.style.background = '#333'}
-                onMouseLeave={e => e.currentTarget.style.background = '#1A1A1A'}
-              >
-                <span style={{ fontSize: 11, background: '#FEF0FB', color: '#6B1560', padding: '1px 5px', borderRadius: 4 }}>IG</span>
-                Ver reporte métricas
-              </a>
-            )}
-            <button className="btn-ghost" onClick={openEditCamp}>✎ Editar</button>
-            <button className="btn-ghost" onClick={() => setChangeEstadoModal(true)}>Cambiar estado</button>
-            {!isReadOnly && !isEspecial && campTab === 'influencers' && (
-              <button className="btn-red" onClick={openAddInfModal}>+ Agregar influencers</button>
-            )}
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 3 }}>
+                <h1 style={{ fontSize: isMobile ? 16 : 20, fontWeight: 500 }}>{currentCamp.nombre}</h1>
+                <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 20, background: ec.bg, color: ec.color, flexShrink: 0 }}>{currentCamp.estado}</span>
+                {!isPlaylisting && <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 20, background: '#F0F0EE', color: '#666', flexShrink: 0 }}>{plat}</span>}
+                {currentCamp.tipo !== 'Estándar' && <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 20, background: '#1A1A1A', color: '#fff', flexShrink: 0 }}>{currentCamp.tipo}</span>}
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                {currentCamp.client_nombre && <span style={{ fontSize: 12, color: clientColor, fontWeight: 500 }}>{currentCamp.client_nombre}</span>}
+                {currentCamp.artista && <span style={{ fontSize: 12, color: '#888' }}>· {currentCamp.artista}{currentCamp.cancion ? ` — "${currentCamp.cancion}"` : ''}</span>}
+              </div>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 5, flexShrink: 0, alignItems: 'flex-end' }}>
+              {hasReporteTT && (
+                <a href={currentCamp.reporte_url_tt} target="_blank" rel="noopener noreferrer"
+                  style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 10px', borderRadius: 8, fontSize: 11.5, background: '#1A1A1A', color: '#fff', textDecoration: 'none', whiteSpace: 'nowrap' }}>
+                  <span style={{ fontSize: 10, background: '#F0F0EE', color: '#555', padding: '1px 4px', borderRadius: 3 }}>TT</span> Métricas
+                </a>
+              )}
+              {hasReporteIG && (
+                <a href={currentCamp.reporte_url_ig} target="_blank" rel="noopener noreferrer"
+                  style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 10px', borderRadius: 8, fontSize: 11.5, background: '#1A1A1A', color: '#fff', textDecoration: 'none', whiteSpace: 'nowrap' }}>
+                  <span style={{ fontSize: 10, background: '#FEF0FB', color: '#6B1560', padding: '1px 4px', borderRadius: 3 }}>IG</span> Métricas
+                </a>
+              )}
+              <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                <button className="btn-ghost" onClick={openEditCamp} style={{ fontSize: 11.5, padding: '5px 10px' }}>✎ Editar</button>
+                <button className="btn-ghost" onClick={() => setChangeEstadoModal(true)} style={{ fontSize: 11.5, padding: '5px 10px' }}>Estado</button>
+                {!isReadOnly && !isEspecial && campTab === 'influencers' && (
+                  <button className="btn-red" onClick={openAddInfModal} style={{ fontSize: 11.5, padding: '5px 10px' }}>+ Influs</button>
+                )}
+              </div>
+            </div>
           </div>
         </div>
 
@@ -991,7 +1001,7 @@ export default function Campanas({ initialCamp = null }) {
           </div>
         )}
 
-        <BudgetSummary camp={currentCamp} />
+        <BudgetSummary camp={currentCamp} isMobile={isMobile} />
         <SharePanel camp={currentCamp} onUpdate={fetchCamps} />
 
         {/* Vista Playlisting */}
@@ -1089,21 +1099,21 @@ export default function Campanas({ initialCamp = null }) {
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
                   <h2 style={{ fontSize: 14, fontWeight: 500 }}>Influencers en campaña</h2>
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                    <span style={{ fontSize: 12, color: '#AAA' }}>{currentCamp.influencers.length} seleccionados</span>
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                    {!isMobile && <span style={{ fontSize: 12, color: '#AAA' }}>{currentCamp.influencers.length} seleccionados</span>}
                     {showTT && (
-                      <button className="btn-ghost" style={{ fontSize: 12 }} onClick={() => {
+                      <button className="btn-ghost" style={{ fontSize: 11, padding: '4px 8px' }} onClick={() => {
                         const links = currentCamp.influencers.map(i => i.video_link_tt).filter(l => l && l.trim())
                         if (!links.length) return alert('No hay links de TikTok cargados')
                         navigator.clipboard.writeText(links.join('\n')).then(() => alert(`${links.length} links copiados`)).catch(() => prompt('Copia:', links.join('\n')))
-                      }}>Copiar links TT</button>
+                      }}>Links TT</button>
                     )}
                     {showIG && (
-                      <button className="btn-ghost" style={{ fontSize: 12 }} onClick={() => {
+                      <button className="btn-ghost" style={{ fontSize: 11, padding: '4px 8px' }} onClick={() => {
                         const links = currentCamp.influencers.map(i => i.video_link_ig).filter(l => l && l.trim())
                         if (!links.length) return alert('No hay links de Instagram cargados')
                         navigator.clipboard.writeText(links.join('\n')).then(() => alert(`${links.length} links copiados`)).catch(() => prompt('Copia:', links.join('\n')))
-                      }}>Copiar links IG</button>
+                      }}>Links IG</button>
                     )}
                   </div>
                 </div>
@@ -1111,8 +1121,8 @@ export default function Campanas({ initialCamp = null }) {
                   {currentCamp.influencers.length === 0 ? (
                     <div style={{ padding: 40, textAlign: 'center', color: '#AAA', fontSize: 13 }}>Agrega influencers desde el roster.</div>
                   ) : (
-                    <div style={{ overflowX: 'auto' }}>
-                      <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+                    <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', minWidth: isMobile ? 640 : 'auto' }}>
                         <thead>
                           <tr style={{ background: '#F7F7F5', borderBottom: '0.5px solid #E5E5E2' }}>
                             <th className="th" style={{ width: 180 }}>Influencer</th>
@@ -1185,6 +1195,11 @@ export default function Campanas({ initialCamp = null }) {
                         </tbody>
                       </table>
                     </div>
+                    {isMobile && (
+                      <div style={{ padding: '6px 12px', fontSize: 10.5, color: '#BBB', textAlign: 'center', borderTop: '0.5px solid #F0F0EE' }}>
+                        ← desliza para ver más →
+                      </div>
+                    )}
                   )}
                 </div>
               </div>
@@ -1353,13 +1368,16 @@ export default function Campanas({ initialCamp = null }) {
 
   // ─── VISTA LISTA ───
   return (
-    <div style={{ padding: '20px 24px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+    <div style={{ padding: isMobile ? '14px 16px' : '20px 24px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: isMobile ? 14 : 20 }}>
         <div>
-          <h1 style={{ fontSize: 20, fontWeight: 500 }}>Campañas</h1>
+          <h1 style={{ fontSize: isMobile ? 18 : 20, fontWeight: 500 }}>Campañas</h1>
           <p style={{ fontSize: 12, color: '#888', marginTop: 2 }}>{camps.length} campañas en total</p>
         </div>
-        <button className="btn-red" onClick={() => { setCampForm(EMPTY_CAMP); setCampFormError(''); setModalNewCamp(true) }}>+ Nueva campaña</button>
+        <button className="btn-red" onClick={() => { setCampForm(EMPTY_CAMP); setCampFormError(''); setModalNewCamp(true) }}
+          style={{ fontSize: isMobile ? 13 : 14, padding: isMobile ? '7px 12px' : undefined }}>
+          {isMobile ? '+ Nueva' : '+ Nueva campaña'}
+        </button>
       </div>
 
       <div style={{ display: 'flex', gap: 2, background: '#F0F0EE', borderRadius: 10, padding: 3, marginBottom: 20, width: 'fit-content', border: '0.5px solid #E5E5E2' }}>
@@ -1376,7 +1394,7 @@ export default function Campanas({ initialCamp = null }) {
       {filteredCamps.length === 0 ? (
         <div style={{ padding: 60, textAlign: 'center', color: '#AAA', fontSize: 13 }}>No hay campañas {tab !== 'Todas' ? tab.toLowerCase() : ''}.</div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 14 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
           {filteredCamps.map(camp => {
             const usado = camp.influencers.reduce((s, i) => s + Number(i.costo), 0)
             const ec = ESTADO_CAMP_COLORS[camp.estado] || ESTADO_CAMP_COLORS['Activa']
