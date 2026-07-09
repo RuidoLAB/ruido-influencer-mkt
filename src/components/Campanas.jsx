@@ -1179,90 +1179,92 @@ export default function Campanas({ initialCamp = null }) {
                   {currentCamp.influencers.length === 0 ? (
                     <div style={{ padding: 40, textAlign: 'center', color: '#AAA', fontSize: 13 }}>Agrega influencers desde el roster.</div>
                   ) : (
-                    <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-                      <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', minWidth: isMobile ? 640 : 'auto' }}>
-                        <thead>
-                          <tr style={{ background: '#F7F7F5', borderBottom: '0.5px solid #E5E5E2' }}>
-                            <th className="th" style={{ width: 180 }}>Influencer</th>
-                            {showIG && <th className="th" style={{ width: 100 }}>Instagram</th>}
-                            {showTT && <th className="th" style={{ width: 100 }}>TikTok</th>}
-                            <th className="th" style={{ width: 110 }}>Categorías</th>
-                            <th className="th" style={{ width: 90 }}>Costo</th>
-                            <th className="th" style={{ width: 50 }}>Piezas</th>
-                            <th className="th" style={{ width: 120 }}>Estado</th>
-                            <th className="th" style={{ width: 90 }}>Videos</th>
-                            <th className="th" style={{ width: 100 }}>Boostcode</th>
-                            {!isReadOnly && <th className="th" style={{ width: 70 }}></th>}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {currentCamp.influencers.map((inf, i) => {
-                            const ec = ESTADO_INF_COLORS[inf.ci_estado] || ESTADO_INF_COLORS['Contactado']
-                            const igSize = getSize(inf.ig_seguidores)
-                            const ttSize = getSize(inf.tt_seguidores)
-                            const tipos = inf.tipos_contenido || []
-                            return (
-                              <tr key={inf.ci_id} style={{ borderBottom: '0.5px solid #F0F0EE' }}>
-                                <td className="td">
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                    <Avatar nombre={inf.nombre} index={i} />
-                                    <div style={{ fontWeight: 500, fontSize: 13 }}>{inf.nombre}</div>
-                                  </div>
-                                </td>
-                                {showIG && (
+                    <>
+                      <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', minWidth: isMobile ? 640 : 'auto' }}>
+                          <thead>
+                            <tr style={{ background: '#F7F7F5', borderBottom: '0.5px solid #E5E5E2' }}>
+                              <th className="th" style={{ width: 180 }}>Influencer</th>
+                              {showIG && <th className="th" style={{ width: 100 }}>Instagram</th>}
+                              {showTT && <th className="th" style={{ width: 100 }}>TikTok</th>}
+                              <th className="th" style={{ width: 110 }}>Categorías</th>
+                              <th className="th" style={{ width: 90 }}>Costo</th>
+                              <th className="th" style={{ width: 50 }}>Piezas</th>
+                              <th className="th" style={{ width: 120 }}>Estado</th>
+                              <th className="th" style={{ width: 90 }}>Videos</th>
+                              <th className="th" style={{ width: 100 }}>Boostcode</th>
+                              {!isReadOnly && <th className="th" style={{ width: 70 }}></th>}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {currentCamp.influencers.map((inf, i) => {
+                              const ec = ESTADO_INF_COLORS[inf.ci_estado] || ESTADO_INF_COLORS['Contactado']
+                              const igSize = getSize(inf.ig_seguidores)
+                              const ttSize = getSize(inf.tt_seguidores)
+                              const tipos = inf.tipos_contenido || []
+                              return (
+                                <tr key={inf.ci_id} style={{ borderBottom: '0.5px solid #F0F0EE' }}>
                                   <td className="td">
-                                    <div style={{ fontSize: 12.5, color: '#555' }}>{fmtSeg(inf.ig_seguidores)}</div>
-                                    <span style={{ background: igSize.bg, color: igSize.color, padding: '0 6px', borderRadius: 20, fontSize: 10 }}>{igSize.label}</span>
-                                  </td>
-                                )}
-                                {showTT && (
-                                  <td className="td">
-                                    <div style={{ fontSize: 12.5, color: '#555' }}>{fmtSeg(inf.tt_seguidores)}</div>
-                                    <span style={{ background: ttSize.bg, color: ttSize.color, padding: '0 6px', borderRadius: 20, fontSize: 10 }}>{ttSize.label}</span>
-                                  </td>
-                                )}
-                                <td className="td">
-                                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
-                                    {tipos.slice(0, 2).map(t => {
-                                      const c = TIPO_COLORS[t] || TIPO_COLORS['Otros']
-                                      return <span key={t} style={{ background: c.bg, color: c.color, padding: '1px 6px', borderRadius: 20, fontSize: 10 }}>{t}</span>
-                                    })}
-                                    {tipos.length > 2 && <span style={{ fontSize: 10, color: '#AAA' }}>+{tipos.length - 2}</span>}
-                                  </div>
-                                </td>
-                                <td className="td">
-                                  <div style={{ fontWeight: 500 }}>{fmtMoney(calcCosto(inf.costo, inf.tipo_facturacion), currentCamp.moneda)}</div>
-                                  {inf.tipo_facturacion !== 'sin_recargo' && (
-                                    <div style={{ fontSize: 10, color: '#AAA', marginTop: 1 }}>base {fmtMoney(inf.costo, currentCamp.moneda)}</div>
-                                  )}
-                                </td>
-                                <td className="td" style={{ color: '#555' }}>{inf.piezas}</td>
-                                <td className="td">
-                                  <span style={{ background: ec.bg, color: ec.color, padding: '2px 8px', borderRadius: 20, fontSize: 11 }}>{inf.ci_estado}</span>
-                                </td>
-                                <td className="td"><VideoCell inf={inf} /></td>
-                                <td className="td">
-                                  {inf.boostcode ? <span style={{ fontFamily: 'monospace', fontSize: 12, background: '#F7F7F5', padding: '2px 7px', borderRadius: 6, color: '#555' }}>{inf.boostcode}</span> : <span style={{ color: '#CCC', fontSize: 12 }}>—</span>}
-                                </td>
-                                {!isReadOnly && (
-                                  <td className="td">
-                                    <div style={{ display: 'flex', gap: 4 }}>
-                                      <button className="btn-icon" onClick={() => openEditCI(inf)}>✎</button>
-                                      <button className="btn-icon btn-icon-danger" onClick={() => setDeleteCI(inf.ci_id)}>✕</button>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                      <Avatar nombre={inf.nombre} index={i} />
+                                      <div style={{ fontWeight: 500, fontSize: 13 }}>{inf.nombre}</div>
                                     </div>
                                   </td>
-                                )}
-                              </tr>
-                            )
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                    {isMobile && (
-                      <div style={{ padding: '6px 12px', fontSize: 10.5, color: '#BBB', textAlign: 'center', borderTop: '0.5px solid #F0F0EE' }}>
-                        ← desliza para ver más →
+                                  {showIG && (
+                                    <td className="td">
+                                      <div style={{ fontSize: 12.5, color: '#555' }}>{fmtSeg(inf.ig_seguidores)}</div>
+                                      <span style={{ background: igSize.bg, color: igSize.color, padding: '0 6px', borderRadius: 20, fontSize: 10 }}>{igSize.label}</span>
+                                    </td>
+                                  )}
+                                  {showTT && (
+                                    <td className="td">
+                                      <div style={{ fontSize: 12.5, color: '#555' }}>{fmtSeg(inf.tt_seguidores)}</div>
+                                      <span style={{ background: ttSize.bg, color: ttSize.color, padding: '0 6px', borderRadius: 20, fontSize: 10 }}>{ttSize.label}</span>
+                                    </td>
+                                  )}
+                                  <td className="td">
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+                                      {tipos.slice(0, 2).map(t => {
+                                        const c = TIPO_COLORS[t] || TIPO_COLORS['Otros']
+                                        return <span key={t} style={{ background: c.bg, color: c.color, padding: '1px 6px', borderRadius: 20, fontSize: 10 }}>{t}</span>
+                                      })}
+                                      {tipos.length > 2 && <span style={{ fontSize: 10, color: '#AAA' }}>+{tipos.length - 2}</span>}
+                                    </div>
+                                  </td>
+                                  <td className="td">
+                                    <div style={{ fontWeight: 500 }}>{fmtMoney(calcCosto(inf.costo, inf.tipo_facturacion), currentCamp.moneda)}</div>
+                                    {inf.tipo_facturacion !== 'sin_recargo' && (
+                                      <div style={{ fontSize: 10, color: '#AAA', marginTop: 1 }}>base {fmtMoney(inf.costo, currentCamp.moneda)}</div>
+                                    )}
+                                  </td>
+                                  <td className="td" style={{ color: '#555' }}>{inf.piezas}</td>
+                                  <td className="td">
+                                    <span style={{ background: ec.bg, color: ec.color, padding: '2px 8px', borderRadius: 20, fontSize: 11 }}>{inf.ci_estado}</span>
+                                  </td>
+                                  <td className="td"><VideoCell inf={inf} /></td>
+                                  <td className="td">
+                                    {inf.boostcode ? <span style={{ fontFamily: 'monospace', fontSize: 12, background: '#F7F7F5', padding: '2px 7px', borderRadius: 6, color: '#555' }}>{inf.boostcode}</span> : <span style={{ color: '#CCC', fontSize: 12 }}>—</span>}
+                                  </td>
+                                  {!isReadOnly && (
+                                    <td className="td">
+                                      <div style={{ display: 'flex', gap: 4 }}>
+                                        <button className="btn-icon" onClick={() => openEditCI(inf)}>✎</button>
+                                        <button className="btn-icon btn-icon-danger" onClick={() => setDeleteCI(inf.ci_id)}>✕</button>
+                                      </div>
+                                    </td>
+                                  )}
+                                </tr>
+                              )
+                            })}
+                          </tbody>
+                        </table>
                       </div>
-                    )}
+                      {isMobile && (
+                        <div style={{ padding: '6px 12px', fontSize: 10.5, color: '#BBB', textAlign: 'center', borderTop: '0.5px solid #F0F0EE' }}>
+                          ← desliza para ver más →
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               </div>
