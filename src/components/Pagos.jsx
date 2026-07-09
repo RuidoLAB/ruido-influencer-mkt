@@ -21,6 +21,23 @@ const AV_COLORS = [
   { bg: '#E8F5E9', color: '#2E7D32' },
 ]
 
+// ─── Constantes centralizadas ───
+const RETENCION_HONORARIOS = 0.1525
+const IVA = 0.19
+
+function calcCosto(base, tipo) {
+  const b = Number(base) || 0
+  if (tipo === 'honorarios')  return Math.round(b / (1 - RETENCION_HONORARIOS))
+  if (tipo === 'factura_iva') return Math.round(b * (1 + IVA))
+  return b
+}
+
+function facturacionLabel(tipo) {
+  if (tipo === 'honorarios')  return 'Boleta'
+  if (tipo === 'factura_iva') return 'Factura IVA'
+  return null
+}
+
 function fmtMoney(n, moneda) {
   n = Math.round(Number(n))
   if (moneda === 'USD') return '$' + n.toLocaleString('en-US')
@@ -49,11 +66,11 @@ export default function Pagos({ camp, onUpdate }) {
   const moneda = camp.moneda || 'CLP'
   const influencers = camp.influencers || []
 
-  // Totales
-  const totalCosto = influencers.reduce((s, i) => s + Number(i.costo), 0)
+  // Totales usando costo final (con recargos)
+  const totalCosto = influencers.reduce((s, i) => s + calcCosto(i.costo, i.tipo_facturacion), 0)
   const totalPagado = influencers
     .filter(i => i.estado_pago === 'Pagado')
-    .reduce((s, i) => s + Number(i.costo), 0)
+    .reduce((s, i) => s + calcCosto(i.costo, i.tipo_facturacion), 0)
   const totalPendiente = totalCosto - totalPagado
   const countPagado = influencers.filter(i => i.estado_pago === 'Pagado').length
   const countBoleta = influencers.filter(i => i.estado_pago === 'Boleta recibida').length
@@ -113,7 +130,7 @@ export default function Pagos({ camp, onUpdate }) {
         </div>
       </div>
 
-      {/* Barra de progreso de pagos */}
+      {/* Barra de progreso */}
       <div style={{ marginBottom: 20 }}>
         {(() => {
           const pct = totalCosto > 0 ? Math.round((totalPagado / totalCosto) * 100) : 0
@@ -143,7 +160,8 @@ export default function Pagos({ camp, onUpdate }) {
               <thead>
                 <tr style={{ background: '#F7F7F5', borderBottom: '0.5px solid #E5E5E2' }}>
                   <th className="th" style={{ width: 200 }}>Influencer</th>
-                  <th className="th" style={{ width: 110 }}>Costo</th>
+                  <th className="th" style={{ width: 130 }}>Costo</th>
+                  <th className="th" style={{ width: 100 }}>Tipo</th>
                   <th className="th" style={{ width: 140 }}>Estado pago</th>
                   <th className="th" style={{ width: 120 }}>Boleta</th>
                   <th className="th" style={{ width: 70 }}></th>
@@ -153,6 +171,8 @@ export default function Pagos({ camp, onUpdate }) {
                 {influencers.map((inf, i) => {
                   const estadoPago = inf.estado_pago || 'Pendiente'
                   const ec = ESTADO_PAGO_COLORS[estadoPago] || ESTADO_PAGO_COLORS['Pendiente']
+                  const costoFinal = calcCosto(inf.costo, inf.tipo_facturacion)
+                  const tipoLabel = facturacionLabel(inf.tipo_facturacion)
                   return (
                     <tr key={inf.ci_id} style={{ borderBottom: '0.5px solid #F0F0EE' }}>
                       <td className="td">
@@ -164,29 +184,30 @@ export default function Pagos({ camp, onUpdate }) {
                           </div>
                         </div>
                       </td>
-                      <td className="td" style={{ fontWeight: 500 }}>
-                        {fmtMoney(inf.costo, moneda)}
+                      <td className="td">
+                        <div style={{ fontWeight: 500, fontSize: 13 }}>{fmtMoney(costoFinal, moneda)}</div>
+                        {tipoLabel && (
+                          <div style={{ fontSize: 10.5, color: '#AAA', marginTop: 1 }}>base {fmtMoney(inf.costo, moneda)}</div>
+                        )}
                       </td>
                       <td className="td">
-                        <span style={{
-                          background: ec.bg, color: ec.color,
-                          padding: '3px 10px', borderRadius: 20, fontSize: 11,
-                        }}>
+                        {tipoLabel
+                          ? <span style={{ fontSize: 11, background: '#F7F7F5', border: '0.5px solid #E5E5E2', padding: '2px 8px', borderRadius: 20, color: '#555' }}>{tipoLabel}</span>
+                          : <span style={{ fontSize: 11, color: '#CCC' }}>—</span>
+                        }
+                      </td>
+                      <td className="td">
+                        <span style={{ background: ec.bg, color: ec.color, padding: '3px 10px', borderRadius: 20, fontSize: 11 }}>
                           {estadoPago}
                         </span>
                       </td>
                       <td className="td">
                         {inf.link_boleta ? (
-                          <a
-                            href={inf.link_boleta}
-                            target="_blank"
-                            rel="noopener noreferrer"
+                          <a href={inf.link_boleta} target="_blank" rel="noopener noreferrer"
                             style={{ color: '#E8313A', fontSize: 12.5, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4 }}
                             onMouseEnter={e => e.currentTarget.style.textDecoration = 'underline'}
                             onMouseLeave={e => e.currentTarget.style.textDecoration = 'none'}
-                          >
-                            Ver boleta ↗
-                          </a>
+                          >Ver boleta ↗</a>
                         ) : (
                           <span style={{ color: '#CCC', fontSize: 12 }}>—</span>
                         )}
@@ -205,9 +226,28 @@ export default function Pagos({ camp, onUpdate }) {
 
       {/* Modal editar pago */}
       <Modal open={editModal} onClose={() => setEditModal(false)} title={`Pago — ${editInf?.nombre}`}>
-        <div style={{ fontSize: 13, color: '#888', marginBottom: 16 }}>
-          Costo: <strong>{fmtMoney(editInf?.costo, moneda)}</strong>
-        </div>
+        {editInf && (
+          <div style={{ background: '#F7F7F5', border: '0.5px solid #E5E5E2', borderRadius: 10, padding: '10px 14px', marginBottom: 14 }}>
+            {editInf.tipo_facturacion && editInf.tipo_facturacion !== 'sin_recargo' ? (
+              <>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#888', marginBottom: 3 }}>
+                  <span>Costo base</span><span>{fmtMoney(editInf.costo, moneda)}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#888', marginBottom: 3 }}>
+                  <span>{editInf.tipo_facturacion === 'honorarios' ? `Retención (${(RETENCION_HONORARIOS * 100).toFixed(2)}%)` : `IVA (${(IVA * 100).toFixed(0)}%)`}</span>
+                  <span>+{fmtMoney(calcCosto(editInf.costo, editInf.tipo_facturacion) - Number(editInf.costo), moneda)}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, fontWeight: 600, color: '#1A1A1A', borderTop: '0.5px solid #E5E5E2', paddingTop: 6, marginTop: 2 }}>
+                  <span>Total a pagar</span><span>{fmtMoney(calcCosto(editInf.costo, editInf.tipo_facturacion), moneda)}</span>
+                </div>
+              </>
+            ) : (
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, fontWeight: 600, color: '#1A1A1A' }}>
+                <span>Total a pagar</span><span>{fmtMoney(editInf.costo, moneda)}</span>
+              </div>
+            )}
+          </div>
+        )}
         <div className="fg">
           <label className="label">Estado de pago</label>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -215,9 +255,7 @@ export default function Pagos({ camp, onUpdate }) {
               const isActive = editForm.estado_pago === e
               const c = ESTADO_PAGO_COLORS[e]
               return (
-                <div
-                  key={e}
-                  onClick={() => setEditForm(f => ({ ...f, estado_pago: e }))}
+                <div key={e} onClick={() => setEditForm(f => ({ ...f, estado_pago: e }))}
                   style={{
                     padding: '6px 14px', borderRadius: 20, cursor: 'pointer',
                     fontSize: 12.5, userSelect: 'none', transition: 'all .12s',
@@ -235,12 +273,9 @@ export default function Pagos({ camp, onUpdate }) {
         </div>
         <div className="fg">
           <label className="label">Link de boleta (Google Drive, Dropbox, etc.)</label>
-          <input
-            className="input"
-            value={editForm.link_boleta}
+          <input className="input" value={editForm.link_boleta}
             onChange={e => setEditForm(f => ({ ...f, link_boleta: e.target.value }))}
-            placeholder="https://drive.google.com/..."
-          />
+            placeholder="https://drive.google.com/..." />
         </div>
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
           <button className="btn-ghost" onClick={() => setEditModal(false)}>Cancelar</button>
