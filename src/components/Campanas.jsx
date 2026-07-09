@@ -154,11 +154,12 @@ function FacturacionToggle({ value, onChange }) {
     </div>
   )
 }
+function isValidUrl(url) {
   if (!url || !url.trim()) return true
   try {
     const u = new URL(url)
     return u.protocol === 'https:' || u.protocol === 'http:'
-  } catch { return false }
+  } catch (e) { return false }
 }
 
 function Avatar({ nombre, index, size = 30 }) {
