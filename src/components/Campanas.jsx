@@ -99,7 +99,61 @@ function fmtMoney(n, moneda) {
   return '$' + n.toLocaleString('es-CL')
 }
 
-function isValidUrl(url) {
+// ─── FACTURACIÓN ───
+const RETENCION_HONORARIOS = 0.1525
+const IVA = 0.19
+
+const TIPOS_FACTURACION = [
+  { id: 'sin_recargo', label: 'Sin recargo' },
+  { id: 'honorarios',  label: 'Boleta' },
+  { id: 'factura_iva', label: 'Factura IVA' },
+]
+
+function calcCosto(base, tipo) {
+  const b = Number(base) || 0
+  if (tipo === 'honorarios')  return Math.round(b / (1 - RETENCION_HONORARIOS))
+  if (tipo === 'factura_iva') return Math.round(b * (1 + IVA))
+  return b
+}
+
+function FacturacionDesglose({ base, tipo }) {
+  const b = Number(base) || 0
+  const final = calcCosto(b, tipo)
+  if (tipo === 'sin_recargo' || b === 0) return null
+  const diff = final - b
+  const label = tipo === 'honorarios' ? `Retención (${(RETENCION_HONORARIOS * 100).toFixed(2)}%)` : `IVA (${(IVA * 100).toFixed(0)}%)`
+  return (
+    <div style={{ background: '#F7F7F5', border: '0.5px solid #E5E5E2', borderRadius: 8, padding: '8px 12px', marginTop: 6, fontSize: 12 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', color: '#888', marginBottom: 3 }}>
+        <span>Costo base</span><span>${b.toLocaleString('es-CL')}</span>
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', color: '#888', marginBottom: 3 }}>
+        <span>{label}</span><span>+${diff.toLocaleString('es-CL')}</span>
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 600, color: '#1A1A1A', borderTop: '0.5px solid #E5E5E2', paddingTop: 4, marginTop: 2 }}>
+        <span>Total</span><span>${final.toLocaleString('es-CL')}</span>
+      </div>
+    </div>
+  )
+}
+
+function FacturacionToggle({ value, onChange }) {
+  return (
+    <div style={{ display: 'flex', gap: 4, background: '#F0F0EE', borderRadius: 8, padding: 3, border: '0.5px solid #E5E5E2' }}>
+      {TIPOS_FACTURACION.map(t => (
+        <div key={t.id} onClick={() => onChange(t.id)} style={{
+          flex: 1, textAlign: 'center', padding: '5px 8px', borderRadius: 6,
+          fontSize: 11.5, cursor: 'pointer', userSelect: 'none', transition: 'all .12s',
+          background: value === t.id ? '#fff' : 'transparent',
+          color: value === t.id ? '#1A1A1A' : '#888',
+          fontWeight: value === t.id ? 500 : 400,
+          boxShadow: value === t.id ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+          border: value === t.id ? '0.5px solid #E5E5E2' : '0.5px solid transparent',
+        }}>{t.label}</div>
+      ))}
+    </div>
+  )
+}
   if (!url || !url.trim()) return true
   try {
     const u = new URL(url)
@@ -137,7 +191,7 @@ function BudgetBar({ usado, total }) {
 }
 
 function BudgetSummary({ camp, isMobile }) {
-  const usado = camp.influencers?.reduce((s, i) => s + Number(i.costo), 0) || 0
+  const usado = camp.influencers?.reduce((s, i) => s + calcCosto(i.costo, i.tipo_facturacion), 0) || 0
   const restante = camp.budget - usado
   const pct = camp.budget > 0 ? Math.min(100, Math.round((usado / camp.budget) * 100)) : 0
   const statusColor = pct >= 100 ? '#A32D2D' : pct >= 90 ? '#854F0B' : '#3B6D11'
@@ -193,7 +247,7 @@ const EMPTY_CAMP = {
   tipo: 'Estándar', contenidos_count: '', views_logradas: '',
   views_min: '', views_max: '',
 }
-const EMPTY_CI_EDIT = { costo: '', piezas: '1', estado: 'Contactado', notas: '', video_link_tt: '', video_link_ig: '', boostcode: '' }
+const EMPTY_CI_EDIT = { costo: '', piezas: '1', estado: 'Contactado', notas: '', video_link_tt: '', video_link_ig: '', boostcode: '', tipo_facturacion: 'sin_recargo' }
 
 // ─── BARRA DE PROGRESO CLIPPING ───
 function ClippingBar({ logradas, min, max }) {
@@ -532,6 +586,7 @@ export default function Campanas({ initialCamp = null }) {
             boostcode: row.boostcode || '',
             estado_pago: row.estado_pago || 'Pendiente',
             link_boleta: row.link_boleta || '',
+            tipo_facturacion: row.tipo_facturacion || 'sin_recargo',
             nombre: row.inf_nombre,
             ig_usuario: row.ig_usuario, ig_seguidores: row.ig_seguidores,
             tt_usuario: row.tt_usuario, tt_seguidores: row.tt_seguidores,
@@ -770,6 +825,7 @@ export default function Campanas({ initialCamp = null }) {
       video_link_tt: inf.video_link_tt || '',
       video_link_ig: inf.video_link_ig || '',
       boostcode: inf.boostcode || '',
+      tipo_facturacion: inf.tipo_facturacion || 'sin_recargo',
     })
     setEditCIModal(true)
   }
@@ -786,7 +842,8 @@ export default function Campanas({ initialCamp = null }) {
           notas = ${editCIForm.notas},
           video_link_tt = ${editCIForm.video_link_tt},
           video_link_ig = ${editCIForm.video_link_ig},
-          boostcode = ${editCIForm.boostcode}
+          boostcode = ${editCIForm.boostcode},
+          tipo_facturacion = ${editCIForm.tipo_facturacion || 'sin_recargo'}
         WHERE id = ${editCI.ci_id}
       `
       if (editCIForm.video_link_tt && editCIForm.video_link_tt !== ttAnterior) {
@@ -1172,7 +1229,12 @@ export default function Campanas({ initialCamp = null }) {
                                     {tipos.length > 2 && <span style={{ fontSize: 10, color: '#AAA' }}>+{tipos.length - 2}</span>}
                                   </div>
                                 </td>
-                                <td className="td" style={{ fontWeight: 500 }}>{fmtMoney(inf.costo, currentCamp.moneda)}</td>
+                                <td className="td">
+                                  <div style={{ fontWeight: 500 }}>{fmtMoney(calcCosto(inf.costo, inf.tipo_facturacion), currentCamp.moneda)}</div>
+                                  {inf.tipo_facturacion !== 'sin_recargo' && (
+                                    <div style={{ fontSize: 10, color: '#AAA', marginTop: 1 }}>base {fmtMoney(inf.costo, currentCamp.moneda)}</div>
+                                  )}
+                                </td>
                                 <td className="td" style={{ color: '#555' }}>{inf.piezas}</td>
                                 <td className="td">
                                   <span style={{ background: ec.bg, color: ec.color, padding: '2px 8px', borderRadius: 20, fontSize: 11 }}>{inf.ci_estado}</span>
@@ -1301,13 +1363,18 @@ export default function Campanas({ initialCamp = null }) {
         <Modal open={editCIModal} onClose={() => setEditCIModal(false)} title={`Editar — ${editCI?.nombre}`}>
           <div className="form-row-2">
             <div className="fg">
-              <label className="label">Costo ({currentCamp.moneda})</label>
+              <label className="label">Costo base ({currentCamp.moneda})</label>
               <input className="input" type="number" value={editCIForm.costo} onChange={e => setEditCIForm(f => ({ ...f, costo: e.target.value }))} />
             </div>
             <div className="fg">
               <label className="label">Piezas</label>
               <input className="input" type="number" value={editCIForm.piezas} onChange={e => setEditCIForm(f => ({ ...f, piezas: e.target.value }))} />
             </div>
+          </div>
+          <div className="fg">
+            <label className="label">Tipo de facturación</label>
+            <FacturacionToggle value={editCIForm.tipo_facturacion} onChange={v => setEditCIForm(f => ({ ...f, tipo_facturacion: v }))} />
+            <FacturacionDesglose base={editCIForm.costo} tipo={editCIForm.tipo_facturacion} />
           </div>
           <div className="fg">
             <label className="label">Estado</label>
@@ -1396,7 +1463,7 @@ export default function Campanas({ initialCamp = null }) {
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
           {filteredCamps.map(camp => {
-            const usado = camp.influencers.reduce((s, i) => s + Number(i.costo), 0)
+            const usado = camp.influencers.reduce((s, i) => s + calcCosto(i.costo, i.tipo_facturacion), 0)
             const ec = ESTADO_CAMP_COLORS[camp.estado] || ESTADO_CAMP_COLORS['Activa']
             const isInactive = camp.estado === 'Cerrada' || camp.estado === 'Cancelada'
             const clientColor = camp.client_color || '#AAA'
