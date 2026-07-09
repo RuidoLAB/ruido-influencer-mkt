@@ -542,7 +542,7 @@ export default function Campanas({ initialCamp = null }) {
           ci.id AS ci_id, ci.costo, ci.piezas,
           ci.estado AS ci_estado, ci.notas AS ci_notas,
           ci.video_link_tt, ci.video_link_ig,
-          ci.boostcode, ci.estado_pago, ci.link_boleta,
+          ci.boostcode, ci.estado_pago, ci.link_boleta, ci.tipo_facturacion,
           ci.influencer_id,
           i.nombre AS inf_nombre,
           i.ig_usuario, i.ig_seguidores,
