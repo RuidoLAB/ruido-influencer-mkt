@@ -483,6 +483,8 @@ export default function Campanas({ initialCamp = null }) {
   const [roster, setRoster] = useState([])
   const [clientsList, setClientsList] = useState([])
   const [tab, setTab] = useState('Activas')
+  const [filterAnio, setFilterAnio] = useState('')
+  const [sortOrder, setSortOrder] = useState('reciente')
   const [campTab, setCampTab] = useState('influencers')
 
   const [modalNewCamp, setModalNewCamp] = useState(false)
@@ -868,10 +870,18 @@ export default function Campanas({ initialCamp = null }) {
     } catch (e) { console.error(e) }
   }
 
-  const filteredCamps = camps.filter(c => {
-    if (tab === 'Todas') return true
-    return c.estado === tab.slice(0, -1)
-  })
+  const anios = [...new Set(camps.map(c => c.created_at ? new Date(c.created_at).getFullYear() : null).filter(Boolean))].sort((a, b) => b - a)
+
+  const filteredCamps = camps
+    .filter(c => {
+      const matchEstado = tab === 'Todas' || c.estado === tab.slice(0, -1)
+      const matchAnio = !filterAnio || (c.created_at && new Date(c.created_at).getFullYear() === parseInt(filterAnio))
+      return matchEstado && matchAnio
+    })
+    .sort((a, b) => sortOrder === 'reciente'
+      ? new Date(b.created_at) - new Date(a.created_at)
+      : new Date(a.created_at) - new Date(b.created_at)
+    )
 
   const availableInfs = roster.filter(inf => {
     if (currentCamp?.influencers.find(i => i.influencer_id === inf.id)) return false
@@ -1450,15 +1460,29 @@ export default function Campanas({ initialCamp = null }) {
         </button>
       </div>
 
-      <div style={{ display: 'flex', gap: 2, background: '#F0F0EE', borderRadius: 10, padding: 3, marginBottom: 20, width: 'fit-content', border: '0.5px solid #E5E5E2' }}>
-        {TABS_LISTA.map(t => {
-          const count = t === 'Todas' ? camps.length : camps.filter(c => c.estado === t.slice(0, -1)).length
-          return (
-            <div key={t} onClick={() => setTab(t)} style={{ padding: '6px 14px', borderRadius: 8, cursor: 'pointer', fontSize: 12.5, display: 'flex', alignItems: 'center', gap: 5, background: tab === t ? '#fff' : 'transparent', color: tab === t ? '#1A1A1A' : '#888', boxShadow: tab === t ? '0 1px 3px rgba(0,0,0,0.08)' : 'none', border: tab === t ? '0.5px solid #E5E5E2' : '0.5px solid transparent' }}>
-              {t}{count > 0 && <span style={{ fontSize: 10, color: '#AAA' }}>{count}</span>}
-            </div>
-          )
-        })}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 2, background: '#F0F0EE', borderRadius: 10, padding: 3, border: '0.5px solid #E5E5E2', flex: isMobile ? '1 1 100%' : 'none' }}>
+          {TABS_LISTA.map(t => {
+            const count = t === 'Todas' ? camps.length : camps.filter(c => c.estado === t.slice(0, -1)).length
+            return (
+              <div key={t} onClick={() => setTab(t)} style={{ padding: '6px 14px', borderRadius: 8, cursor: 'pointer', fontSize: 12.5, display: 'flex', alignItems: 'center', gap: 5, background: tab === t ? '#fff' : 'transparent', color: tab === t ? '#1A1A1A' : '#888', boxShadow: tab === t ? '0 1px 3px rgba(0,0,0,0.08)' : 'none', border: tab === t ? '0.5px solid #E5E5E2' : '0.5px solid transparent' }}>
+                {t}{count > 0 && <span style={{ fontSize: 10, color: '#AAA' }}>{count}</span>}
+              </div>
+            )
+          })}
+        </div>
+        {anios.length > 1 && (
+          <select className="input" value={filterAnio} onChange={e => setFilterAnio(e.target.value)}
+            style={{ width: isMobile ? '100%' : 'auto', minHeight: isMobile ? 42 : 'auto' }}>
+            <option value="">Todos los años</option>
+            {anios.map(a => <option key={a}>{a}</option>)}
+          </select>
+        )}
+        <select className="input" value={sortOrder} onChange={e => setSortOrder(e.target.value)}
+          style={{ width: isMobile ? '100%' : 'auto', minHeight: isMobile ? 42 : 'auto' }}>
+          <option value="reciente">Más reciente</option>
+          <option value="antigua">Más antigua</option>
+        </select>
       </div>
 
       {filteredCamps.length === 0 ? (
