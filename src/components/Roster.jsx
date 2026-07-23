@@ -26,6 +26,23 @@ const SIZE_RANGES = [
   { label: 'Mega',  min: 4000000, max: Infinity, bg: '#FAEEDA', color: '#633806' },
 ]
 
+const ESTADO_CAMP_COLORS = {
+  Activa:    { bg: '#EAF3DE', color: '#27500A' },
+  Pausada:   { bg: '#FAEEDA', color: '#633806' },
+  Cerrada:   { bg: '#E6F1FB', color: '#0C447C' },
+  Cancelada: { bg: '#FCEBEB', color: '#791F1F' },
+}
+
+const RETENCION_HONORARIOS = 0.1525
+const IVA = 0.19
+
+function calcCosto(base, tipo) {
+  const b = Number(base) || 0
+  if (tipo === 'honorarios')  return Math.round(b / (1 - RETENCION_HONORARIOS))
+  if (tipo === 'factura_iva') return Math.round(b * (1 + IVA))
+  return b
+}
+
 function getSize(n) {
   n = Number(n)
   return SIZE_RANGES.find(r => n >= r.min && n < r.max) || SIZE_RANGES[0]
@@ -47,6 +64,15 @@ function fmtSeg(n) {
   if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M'
   if (n >= 1000) return Math.round(n / 1000) + 'K'
   return n.toLocaleString('es-CL')
+}
+
+function fmtMoney(n) {
+  return '$' + Math.round(Number(n) || 0).toLocaleString('es-CL')
+}
+
+function fmtDate(d) {
+  if (!d) return '—'
+  return new Date(d).toLocaleDateString('es-CL', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
 function useIsMobile() {
@@ -95,15 +121,9 @@ function TiposBadges({ tipos, max }) {
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
       {shown.map(t => {
         const c = TIPO_COLORS[t] || TIPO_COLORS['Otros']
-        return (
-          <span key={t} style={{ background: c.bg, color: c.color, padding: '1px 7px', borderRadius: 20, fontSize: 10.5 }}>
-            {t}
-          </span>
-        )
+        return <span key={t} style={{ background: c.bg, color: c.color, padding: '1px 7px', borderRadius: 20, fontSize: 10.5 }}>{t}</span>
       })}
-      {max && tipos.length > max && (
-        <span style={{ fontSize: 10.5, color: '#AAA' }}>+{tipos.length - max}</span>
-      )}
+      {max && tipos.length > max && <span style={{ fontSize: 10.5, color: '#AAA' }}>+{tipos.length - max}</span>}
     </div>
   )
 }
@@ -154,6 +174,199 @@ function getDuplicateMessage(errorMsg) {
   return null
 }
 
+// ─── PANEL LATERAL DE INFLUENCER ───
+function InfluencerPanel({ inf, index, isMobile, onClose, onEdit }) {
+  const [historial, setHistorial] = useState([])
+  const [loadingH, setLoadingH] = useState(true)
+
+  useEffect(() => {
+    if (!inf) return
+    fetchHistorial(inf.id)
+  }, [inf?.id])
+
+  async function fetchHistorial(infId) {
+    setLoadingH(true)
+    try {
+      const data = await sql`
+        SELECT
+          ci.costo, ci.piezas, ci.tipo_facturacion, ci.created_at AS ci_created_at,
+          c.id AS camp_id, c.nombre AS camp_nombre, c.cliente, c.estado AS camp_estado,
+          c.tipo AS camp_tipo, c.created_at AS camp_created_at, c.moneda
+        FROM campaign_influencers ci
+        JOIN campaigns c ON c.id = ci.campaign_id
+        WHERE ci.influencer_id = ${infId}
+        ORDER BY c.created_at DESC
+      `
+      setHistorial(data)
+    } catch (e) { console.error(e) }
+    setLoadingH(false)
+  }
+
+  if (!inf) return null
+
+  const igSize = getSize(inf.ig_seguidores)
+  const ttSize = getSize(inf.tt_seguidores)
+  const tipos = inf.tipos_contenido || []
+
+  // Último precio — primera entrada del historial que tenga costo > 0
+  const ultimaParticipacion = historial.find(h => Number(h.costo) > 0)
+  const ultimoPrecio = ultimaParticipacion
+    ? calcCosto(ultimaParticipacion.costo, ultimaParticipacion.tipo_facturacion)
+    : null
+
+  const panelWidth = isMobile ? '100%' : 400
+
+  return (
+    <>
+      {/* Overlay */}
+      <div
+        onClick={onClose}
+        style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.2)',
+          zIndex: 200, backdropFilter: 'blur(1px)',
+        }}
+      />
+
+      {/* Panel */}
+      <div style={{
+        position: 'fixed',
+        top: 0, right: 0, bottom: 0,
+        width: panelWidth,
+        background: '#fff',
+        boxShadow: '-4px 0 24px rgba(0,0,0,0.1)',
+        zIndex: 201,
+        display: 'flex', flexDirection: 'column',
+        overflowY: 'auto',
+      }}>
+        {/* Header panel */}
+        <div style={{ padding: '20px 20px 16px', borderBottom: '0.5px solid #E5E5E2', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+            <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 18, color: '#AAA', cursor: 'pointer', padding: 4 }}>✕</button>
+            <button className="btn-ghost" onClick={() => { onClose(); onEdit(inf) }} style={{ fontSize: 12 }}>✎ Editar</button>
+          </div>
+
+          {/* Identidad */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
+            <Avatar nombre={inf.nombre} index={index} size={48} />
+            <div>
+              <div style={{ fontSize: 17, fontWeight: 500, marginBottom: 3 }}>{inf.nombre}</div>
+              <span style={{
+                fontSize: 11, padding: '2px 8px', borderRadius: 20,
+                background: inf.estado === 'Activo' ? '#EAF3DE' : '#F1EFE8',
+                color: inf.estado === 'Activo' ? '#27500A' : '#5F5E5A',
+              }}>{inf.estado}</span>
+            </div>
+          </div>
+
+          {/* Redes */}
+          <div style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
+            {inf.ig_seguidores > 0 && (
+              <div style={{ flex: 1, background: '#F7F7F5', borderRadius: 8, padding: '8px 10px' }}>
+                <div style={{ fontSize: 9.5, color: '#AAA', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 3 }}>Instagram</div>
+                <UserLink username={inf.ig_usuario} link={inf.ig_link} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
+                  <span style={{ fontSize: 11, color: '#AAA' }}>{fmtSeg(inf.ig_seguidores)}</span>
+                  <span style={{ background: igSize.bg, color: igSize.color, padding: '0 5px', borderRadius: 10, fontSize: 10 }}>{igSize.label}</span>
+                </div>
+              </div>
+            )}
+            {inf.tt_seguidores > 0 && (
+              <div style={{ flex: 1, background: '#F7F7F5', borderRadius: 8, padding: '8px 10px' }}>
+                <div style={{ fontSize: 9.5, color: '#AAA', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 3 }}>TikTok</div>
+                <UserLink username={inf.tt_usuario} link={inf.tt_link} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
+                  <span style={{ fontSize: 11, color: '#AAA' }}>{fmtSeg(inf.tt_seguidores)}</span>
+                  <span style={{ background: ttSize.bg, color: ttSize.color, padding: '0 5px', borderRadius: 10, fontSize: 10 }}>{ttSize.label}</span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Categorías */}
+          <TiposBadges tipos={tipos} />
+
+          {/* Notas */}
+          {inf.notas && (
+            <div style={{ marginTop: 10, fontSize: 12, color: '#888', background: '#F7F7F5', borderRadius: 8, padding: '8px 10px' }}>
+              {inf.notas}
+            </div>
+          )}
+        </div>
+
+        {/* Último precio */}
+        {ultimoPrecio && (
+          <div style={{ padding: '14px 20px', borderBottom: '0.5px solid #E5E5E2', flexShrink: 0 }}>
+            <div style={{ fontSize: 10.5, color: '#AAA', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 6 }}>Último precio registrado</div>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 22, fontWeight: 500, color: '#1A1A1A' }}>{fmtMoney(ultimoPrecio)}</span>
+              <span style={{ fontSize: 12, color: '#AAA' }}>en {ultimaParticipacion.camp_nombre}</span>
+            </div>
+            {ultimaParticipacion.tipo_facturacion && ultimaParticipacion.tipo_facturacion !== 'sin_recargo' && (
+              <div style={{ fontSize: 11, color: '#AAA', marginTop: 2 }}>
+                base {fmtMoney(ultimaParticipacion.costo)} ·{' '}
+                {ultimaParticipacion.tipo_facturacion === 'honorarios' ? 'Boleta' : 'Factura IVA'}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Historial de campañas */}
+        <div style={{ padding: '16px 20px', flex: 1 }}>
+          <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 12 }}>
+            Historial de campañas
+            {historial.length > 0 && <span style={{ fontSize: 11, color: '#AAA', fontWeight: 400, marginLeft: 6 }}>{historial.length} campañas</span>}
+          </div>
+
+          {loadingH ? (
+            <div style={{ fontSize: 13, color: '#AAA', textAlign: 'center', padding: 24 }}>Cargando...</div>
+          ) : historial.length === 0 ? (
+            <div style={{ fontSize: 13, color: '#AAA', textAlign: 'center', padding: 32, background: '#F7F7F5', borderRadius: 10 }}>
+              Este influencer todavía no ha participado en ninguna campaña.
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {historial.map((h, i) => {
+                const ec = ESTADO_CAMP_COLORS[h.camp_estado] || ESTADO_CAMP_COLORS['Activa']
+                const costoFinal = calcCosto(h.costo, h.tipo_facturacion)
+                return (
+                  <div key={i} style={{
+                    background: '#F7F7F5', border: '0.5px solid #E5E5E2',
+                    borderRadius: 10, padding: '12px 14px',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 6 }}>
+                      <div style={{ fontWeight: 500, fontSize: 13, lineHeight: 1.3 }}>{h.camp_nombre}</div>
+                      <span style={{ fontSize: 10.5, padding: '2px 7px', borderRadius: 20, background: ec.bg, color: ec.color, flexShrink: 0 }}>
+                        {h.camp_estado}
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', fontSize: 11.5, color: '#888' }}>
+                      {h.cliente && <span>👤 {h.cliente}</span>}
+                      {h.camp_tipo && h.camp_tipo !== 'Estándar' && (
+                        <span style={{ background: '#1A1A1A', color: '#fff', padding: '0 6px', borderRadius: 10, fontSize: 10 }}>{h.camp_tipo}</span>
+                      )}
+                      <span>📅 {fmtDate(h.camp_created_at)}</span>
+                    </div>
+                    {costoFinal > 0 && (
+                      <div style={{ marginTop: 8, display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                        <span style={{ fontSize: 15, fontWeight: 500 }}>{fmtMoney(costoFinal)}</span>
+                        {h.tipo_facturacion && h.tipo_facturacion !== 'sin_recargo' && (
+                          <span style={{ fontSize: 11, color: '#AAA' }}>
+                            base {fmtMoney(h.costo)} · {h.tipo_facturacion === 'honorarios' ? 'Boleta' : 'Factura IVA'}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    </>
+  )
+}
+
 export default function Roster() {
   const isMobile = useIsMobile()
   const [influencers, setInfluencers] = useState([])
@@ -164,6 +377,12 @@ export default function Roster() {
   const [filterEstado, setFilterEstado] = useState('')
   const [sortAsc, setSortAsc] = useState(false)
   const [filtersOpen, setFiltersOpen] = useState(false)
+
+  // Panel lateral
+  const [selectedInf, setSelectedInf] = useState(null)
+  const [selectedIndex, setSelectedIndex] = useState(0)
+
+  // Modal crear/editar
   const [modalOpen, setModalOpen] = useState(false)
   const [form, setForm] = useState(EMPTY)
   const [editId, setEditId] = useState(null)
@@ -184,6 +403,11 @@ export default function Roster() {
       setInfluencers(data)
     } catch (e) { console.error(e) }
     setLoading(false)
+  }
+
+  function openPanel(inf, index) {
+    setSelectedInf(inf)
+    setSelectedIndex(index)
   }
 
   function openNew() {
@@ -221,16 +445,11 @@ export default function Roster() {
       if (editId) {
         await sql`
           UPDATE influencers SET
-            nombre = ${form.nombre},
-            ig_usuario = ${form.ig_usuario},
-            ig_seguidores = ${ig_seg},
-            ig_link = ${form.ig_link},
-            tt_usuario = ${form.tt_usuario},
-            tt_seguidores = ${tt_seg},
-            tt_link = ${form.tt_link},
-            tipos_contenido = ${form.tipos_contenido},
-            estado = ${form.estado},
-            notas = ${form.notas}
+            nombre = ${form.nombre}, ig_usuario = ${form.ig_usuario},
+            ig_seguidores = ${ig_seg}, ig_link = ${form.ig_link},
+            tt_usuario = ${form.tt_usuario}, tt_seguidores = ${tt_seg},
+            tt_link = ${form.tt_link}, tipos_contenido = ${form.tipos_contenido},
+            estado = ${form.estado}, notas = ${form.notas}
           WHERE id = ${editId}
         `
       } else {
@@ -248,6 +467,8 @@ export default function Roster() {
       }
       setModalOpen(false)
       setDuplicateError(null)
+      // Si estaba abierto el panel del influencer editado, actualizar
+      if (editId && selectedInf?.id === editId) setSelectedInf(null)
       await fetchInfluencers()
     } catch (e) {
       const dupMsg = getDuplicateMessage(e.message)
@@ -261,6 +482,7 @@ export default function Roster() {
     try {
       await sql`DELETE FROM influencers WHERE id = ${id}`
       setDeleteId(null)
+      if (selectedInf?.id === id) setSelectedInf(null)
       await fetchInfluencers()
     } catch (e) { console.error(e) }
   }
@@ -290,6 +512,17 @@ export default function Roster() {
 
   return (
     <div style={{ padding: isMobile ? '16px' : '20px 24px' }}>
+
+      {/* Panel lateral */}
+      {selectedInf && (
+        <InfluencerPanel
+          inf={selectedInf}
+          index={selectedIndex}
+          isMobile={isMobile}
+          onClose={() => setSelectedInf(null)}
+          onEdit={openEdit}
+        />
+      )}
 
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
@@ -328,9 +561,8 @@ export default function Roster() {
               ⚙
               {activeFiltersCount > 0 && (
                 <span style={{
-                  position: 'absolute', top: -4, right: -4,
-                  width: 16, height: 16, borderRadius: '50%',
-                  background: '#E8313A', color: '#fff',
+                  position: 'absolute', top: -4, right: -4, width: 16, height: 16,
+                  borderRadius: '50%', background: '#E8313A', color: '#fff',
                   fontSize: 9, display: 'flex', alignItems: 'center', justifyContent: 'center',
                 }}>{activeFiltersCount}</span>
               )}
@@ -348,8 +580,7 @@ export default function Roster() {
               </select>
               <select className="input" value={filterEstado} onChange={e => setFilterEstado(e.target.value)} style={{ minHeight: 42 }}>
                 <option value="">Todos los estados</option>
-                <option>Activo</option>
-                <option>Inactivo</option>
+                <option>Activo</option><option>Inactivo</option>
               </select>
               <select className="input" value={sortAsc ? 'asc' : 'desc'} onChange={e => setSortAsc(e.target.value === 'asc')} style={{ minHeight: 42 }}>
                 <option value="desc">Mayor alcance primero</option>
@@ -378,8 +609,7 @@ export default function Roster() {
           </select>
           <select className="input" value={filterEstado} onChange={e => setFilterEstado(e.target.value)}>
             <option value="">Todos los estados</option>
-            <option>Activo</option>
-            <option>Inactivo</option>
+            <option>Activo</option><option>Inactivo</option>
           </select>
         </div>
       )}
@@ -389,9 +619,7 @@ export default function Roster() {
         <div style={{ padding: 40, textAlign: 'center', color: '#AAA', fontSize: 13 }}>Cargando...</div>
       ) : filtered.length === 0 ? (
         <div style={{ padding: 40, textAlign: 'center', color: '#AAA', fontSize: 13 }}>
-          {search || filterTipo || filterEstado || filterSize
-            ? 'Sin resultados para ese filtro'
-            : 'Aún no hay influencers. Agrega el primero.'}
+          {search || filterTipo || filterEstado || filterSize ? 'Sin resultados para ese filtro' : 'Aún no hay influencers. Agrega el primero.'}
         </div>
       ) : isMobile ? (
         // ─── VISTA MOBILE: tarjetas ───
@@ -401,12 +629,15 @@ export default function Roster() {
             const ttSize = getSize(inf.tt_seguidores)
             const tipos = inf.tipos_contenido || []
             const isActivo = inf.estado === 'Activo'
+            const isSelected = selectedInf?.id === inf.id
             return (
-              <div key={inf.id} style={{
-                background: '#fff', border: '0.5px solid #E5E5E2', borderRadius: 12,
-                padding: '14px', opacity: isActivo ? 1 : 0.65,
-              }}>
-                {/* Fila superior: avatar + nombre + estado + acciones */}
+              <div key={inf.id}
+                onClick={() => openPanel(inf, i)}
+                style={{
+                  background: '#fff', border: `0.5px solid ${isSelected ? '#E8313A' : '#E5E5E2'}`,
+                  borderRadius: 12, padding: '14px', opacity: isActivo ? 1 : 0.65,
+                  cursor: 'pointer', transition: 'border-color .15s',
+                }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
                   <Avatar nombre={inf.nombre} index={i} size={40} />
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -418,30 +649,19 @@ export default function Roster() {
                       padding: '1px 7px', borderRadius: 20,
                     }}>{inf.estado}</span>
                   </div>
-                  <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                    <button
-                      onClick={() => openEdit(inf)}
-                      style={{ width: 36, height: 36, borderRadius: 8, border: '0.5px solid #E5E5E2', background: '#F7F7F5', color: '#555', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                    >✎</button>
-                    <button
-                      onClick={() => setDeleteId(inf.id)}
-                      style={{ width: 36, height: 36, borderRadius: 8, border: '0.5px solid #FDDADA', background: '#FEF9F9', color: '#C0392B', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                    >✕</button>
+                  <div style={{ display: 'flex', gap: 6, flexShrink: 0 }} onClick={e => e.stopPropagation()}>
+                    <button onClick={() => openEdit(inf)}
+                      style={{ width: 36, height: 36, borderRadius: 8, border: '0.5px solid #E5E5E2', background: '#F7F7F5', color: '#555', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✎</button>
+                    <button onClick={() => setDeleteId(inf.id)}
+                      style={{ width: 36, height: 36, borderRadius: 8, border: '0.5px solid #FDDADA', background: '#FEF9F9', color: '#C0392B', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
                   </div>
                 </div>
-
-                {/* Seguidores */}
                 <div style={{ display: 'flex', gap: 12, marginBottom: 10 }}>
                   {inf.ig_seguidores > 0 && (
                     <div style={{ flex: 1, background: '#F7F7F5', borderRadius: 8, padding: '8px 10px' }}>
                       <div style={{ fontSize: 10, color: '#AAA', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 3 }}>Instagram</div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                        {inf.ig_link
-                          ? <a href={inf.ig_link} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, fontWeight: 500, color: '#E8313A', textDecoration: 'none' }}>
-                              {inf.ig_usuario || fmtSeg(inf.ig_seguidores)} ↗
-                            </a>
-                          : <span style={{ fontSize: 13, fontWeight: 500, color: '#1A1A1A' }}>{inf.ig_usuario || '—'}</span>
-                        }
+                        <span style={{ fontSize: 13, fontWeight: 500, color: '#1A1A1A' }}>{inf.ig_usuario || '—'}</span>
                         <span style={{ background: igSize.bg, color: igSize.color, padding: '0 5px', borderRadius: 10, fontSize: 10 }}>{igSize.label}</span>
                       </div>
                       <div style={{ fontSize: 11, color: '#AAA', marginTop: 1 }}>{fmtSeg(inf.ig_seguidores)}</div>
@@ -451,23 +671,13 @@ export default function Roster() {
                     <div style={{ flex: 1, background: '#F7F7F5', borderRadius: 8, padding: '8px 10px' }}>
                       <div style={{ fontSize: 10, color: '#AAA', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 3 }}>TikTok</div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                        {inf.tt_link
-                          ? <a href={inf.tt_link} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, fontWeight: 500, color: '#E8313A', textDecoration: 'none' }}>
-                              {inf.tt_usuario || fmtSeg(inf.tt_seguidores)} ↗
-                            </a>
-                          : <span style={{ fontSize: 13, fontWeight: 500, color: '#1A1A1A' }}>{inf.tt_usuario || '—'}</span>
-                        }
+                        <span style={{ fontSize: 13, fontWeight: 500, color: '#1A1A1A' }}>{inf.tt_usuario || '—'}</span>
                         <span style={{ background: ttSize.bg, color: ttSize.color, padding: '0 5px', borderRadius: 10, fontSize: 10 }}>{ttSize.label}</span>
                       </div>
                       <div style={{ fontSize: 11, color: '#AAA', marginTop: 1 }}>{fmtSeg(inf.tt_seguidores)}</div>
                     </div>
                   )}
-                  {inf.ig_seguidores === 0 && inf.tt_seguidores === 0 && (
-                    <div style={{ fontSize: 12, color: '#CCC' }}>Sin datos de seguidores</div>
-                  )}
                 </div>
-
-                {/* Categorías */}
                 <TiposBadges tipos={tipos} max={4} />
               </div>
             )
@@ -483,8 +693,7 @@ export default function Roster() {
                   <th className="th" style={{ width: 200 }}>Influencer</th>
                   <th className="th" style={{ width: 160 }}>Instagram</th>
                   <th className="th" style={{ width: 160 }}>TikTok</th>
-                  <th className="th" style={{ width: 110, cursor: 'pointer', userSelect: 'none' }}
-                    onClick={() => setSortAsc(s => !s)}>
+                  <th className="th" style={{ width: 110, cursor: 'pointer', userSelect: 'none' }} onClick={() => setSortAsc(s => !s)}>
                     Total seg. {sortAsc ? '↑' : '↓'}
                   </th>
                   <th className="th" style={{ width: 200 }}>Categorías</th>
@@ -496,8 +705,18 @@ export default function Roster() {
                 {filtered.map((inf, i) => {
                   const igSize = getSize(inf.ig_seguidores)
                   const ttSize = getSize(inf.tt_seguidores)
+                  const isSelected = selectedInf?.id === inf.id
                   return (
-                    <tr key={inf.id} style={{ borderBottom: '0.5px solid #F0F0EE' }}>
+                    <tr key={inf.id}
+                      onClick={() => openPanel(inf, i)}
+                      style={{
+                        borderBottom: '0.5px solid #F0F0EE', cursor: 'pointer',
+                        background: isSelected ? '#FEF9F9' : 'transparent',
+                        transition: 'background .1s',
+                      }}
+                      onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = '#F7F7F5' }}
+                      onMouseLeave={e => { if (!isSelected) e.currentTarget.style.background = 'transparent' }}
+                    >
                       <td className="td">
                         <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
                           <Avatar nombre={inf.nombre} index={i} />
@@ -525,19 +744,15 @@ export default function Roster() {
                       <td className="td">
                         <span style={{ fontWeight: 500, fontSize: 13 }}>{fmtSeg(Number(inf.total_seguidores))}</span>
                       </td>
-                      <td className="td">
-                        <TiposBadges tipos={inf.tipos_contenido} />
-                      </td>
+                      <td className="td"><TiposBadges tipos={inf.tipos_contenido} /></td>
                       <td className="td">
                         <span style={{
                           background: inf.estado === 'Activo' ? '#EAF3DE' : '#F1EFE8',
                           color: inf.estado === 'Activo' ? '#27500A' : '#5F5E5A',
                           padding: '2px 9px', borderRadius: 20, fontSize: 11,
-                        }}>
-                          {inf.estado}
-                        </span>
+                        }}>{inf.estado}</span>
                       </td>
-                      <td className="td">
+                      <td className="td" onClick={e => e.stopPropagation()}>
                         <div style={{ display: 'flex', gap: 4 }}>
                           <button className="btn-icon" onClick={() => openEdit(inf)} title="Editar">✎</button>
                           <button className="btn-icon btn-icon-danger" onClick={() => setDeleteId(inf.id)} title="Eliminar">✕</button>
@@ -558,11 +773,8 @@ export default function Roster() {
           <label className="label">Nombre</label>
           <input className="input" value={form.nombre}
             onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))}
-            placeholder="Nombre completo"
-            style={{ fontSize: isMobile ? 16 : 14 }} />
+            placeholder="Nombre completo" style={{ fontSize: isMobile ? 16 : 14 }} />
         </div>
-
-        {/* Instagram */}
         <div style={{ background: '#F7F7F5', border: '0.5px solid #E5E5E2', borderRadius: 10, padding: '12px 14px', marginBottom: 8 }}>
           <div style={{ fontSize: 11, color: '#AAA', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 10 }}>Instagram</div>
           <div className="form-row-2">
@@ -570,27 +782,22 @@ export default function Roster() {
               <label className="label">Usuario</label>
               <input className="input" value={form.ig_usuario}
                 onChange={e => { setForm(f => ({ ...f, ig_usuario: e.target.value })); setDuplicateError(null) }}
-                placeholder="@usuario"
-                style={{ fontSize: isMobile ? 16 : 14 }} />
+                placeholder="@usuario" style={{ fontSize: isMobile ? 16 : 14 }} />
             </div>
             <div className="fg">
               <label className="label">Seguidores</label>
               <input className="input" type="number" value={form.ig_seguidores}
                 onChange={e => setForm(f => ({ ...f, ig_seguidores: e.target.value }))}
-                placeholder="0"
-                style={{ fontSize: isMobile ? 16 : 14 }} />
+                placeholder="0" style={{ fontSize: isMobile ? 16 : 14 }} />
             </div>
           </div>
           <div className="fg">
             <label className="label">Link de perfil</label>
             <input className="input" value={form.ig_link}
               onChange={e => setForm(f => ({ ...f, ig_link: e.target.value }))}
-              placeholder="https://instagram.com/usuario"
-              style={{ fontSize: isMobile ? 16 : 14 }} />
+              placeholder="https://instagram.com/usuario" style={{ fontSize: isMobile ? 16 : 14 }} />
           </div>
         </div>
-
-        {/* TikTok */}
         <div style={{ background: '#F7F7F5', border: '0.5px solid #E5E5E2', borderRadius: 10, padding: '12px 14px', marginBottom: 8 }}>
           <div style={{ fontSize: 11, color: '#AAA', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 10 }}>TikTok</div>
           <div className="form-row-2">
@@ -598,43 +805,32 @@ export default function Roster() {
               <label className="label">Usuario</label>
               <input className="input" value={form.tt_usuario}
                 onChange={e => { setForm(f => ({ ...f, tt_usuario: e.target.value })); setDuplicateError(null) }}
-                placeholder="@usuario"
-                style={{ fontSize: isMobile ? 16 : 14 }} />
+                placeholder="@usuario" style={{ fontSize: isMobile ? 16 : 14 }} />
             </div>
             <div className="fg">
               <label className="label">Seguidores</label>
               <input className="input" type="number" value={form.tt_seguidores}
                 onChange={e => setForm(f => ({ ...f, tt_seguidores: e.target.value }))}
-                placeholder="0"
-                style={{ fontSize: isMobile ? 16 : 14 }} />
+                placeholder="0" style={{ fontSize: isMobile ? 16 : 14 }} />
             </div>
           </div>
           <div className="fg">
             <label className="label">Link de perfil</label>
             <input className="input" value={form.tt_link}
               onChange={e => setForm(f => ({ ...f, tt_link: e.target.value }))}
-              placeholder="https://tiktok.com/@usuario"
-              style={{ fontSize: isMobile ? 16 : 14 }} />
+              placeholder="https://tiktok.com/@usuario" style={{ fontSize: isMobile ? 16 : 14 }} />
           </div>
         </div>
-
         <div className="fg">
           <label className="label">Categorías de contenido</label>
-          <TiposCheckboxes
-            selected={form.tipos_contenido}
-            onChange={tipos => setForm(f => ({ ...f, tipos_contenido: tipos }))}
-          />
-          {form.tipos_contenido.length === 0 && (
-            <div style={{ fontSize: 11, color: '#CCC', marginTop: 4 }}>Selecciona al menos una categoría</div>
-          )}
+          <TiposCheckboxes selected={form.tipos_contenido} onChange={tipos => setForm(f => ({ ...f, tipos_contenido: tipos }))} />
+          {form.tipos_contenido.length === 0 && <div style={{ fontSize: 11, color: '#CCC', marginTop: 4 }}>Selecciona al menos una categoría</div>}
         </div>
         <div className="fg">
           <label className="label">Estado</label>
-          <select className="input" value={form.estado}
-            onChange={e => setForm(f => ({ ...f, estado: e.target.value }))}
+          <select className="input" value={form.estado} onChange={e => setForm(f => ({ ...f, estado: e.target.value }))}
             style={{ fontSize: isMobile ? 16 : 14, minHeight: isMobile ? 44 : 'auto' }}>
-            <option>Activo</option>
-            <option>Inactivo</option>
+            <option>Activo</option><option>Inactivo</option>
           </select>
         </div>
         <div className="fg">
@@ -644,18 +840,11 @@ export default function Roster() {
             placeholder="Solo visible para el equipo..."
             style={{ resize: 'vertical', fontSize: isMobile ? 16 : 14 }} />
         </div>
-
         {duplicateError && (
-          <div style={{
-            background: '#FCEBEB', border: '0.5px solid #F7C1C1',
-            borderRadius: 8, padding: '10px 12px', marginBottom: 4,
-            fontSize: 13, color: '#791F1F', display: 'flex', alignItems: 'center', gap: 8,
-          }}>
-            <span>⚠</span>
-            <span>{duplicateError} Busca el influencer existente para editarlo.</span>
+          <div style={{ background: '#FCEBEB', border: '0.5px solid #F7C1C1', borderRadius: 8, padding: '10px 12px', marginBottom: 4, fontSize: 13, color: '#791F1F', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span>⚠</span><span>{duplicateError} Busca el influencer existente para editarlo.</span>
           </div>
         )}
-
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
           <button className="btn-ghost" onClick={() => { setModalOpen(false); setDuplicateError(null) }}>Cancelar</button>
           <button className="btn-red" onClick={handleSave} disabled={saving}
@@ -665,11 +854,9 @@ export default function Roster() {
         </div>
       </Modal>
 
-      {/* Modal confirmar eliminar */}
+      {/* Modal eliminar */}
       <Modal open={!!deleteId} onClose={() => setDeleteId(null)} title="Eliminar influencer">
-        <p style={{ fontSize: 13, color: '#555', marginBottom: 20 }}>
-          ¿Estás segura? Esta acción no se puede deshacer.
-        </p>
+        <p style={{ fontSize: 13, color: '#555', marginBottom: 20 }}>¿Estás segura? Esta acción no se puede deshacer.</p>
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
           <button className="btn-ghost" onClick={() => setDeleteId(null)}>Cancelar</button>
           <button className="btn-danger" onClick={() => handleDelete(deleteId)}>Eliminar</button>
