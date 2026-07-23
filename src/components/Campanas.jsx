@@ -503,6 +503,7 @@ export default function Campanas({ initialCamp = null }) {
   const [infFilterSize, setInfFilterSize] = useState('')
   const [selectedInfIds, setSelectedInfIds] = useState([])
   const [savingCI, setSavingCI] = useState(false)
+  const [ultimosPrecios, setUltimosPrecios] = useState({})
 
   const [editCIModal, setEditCIModal] = useState(false)
   const [editCI, setEditCI] = useState(null)
@@ -781,12 +782,30 @@ export default function Campanas({ initialCamp = null }) {
     } catch (e) { console.error(e) }
   }
 
-  function openAddInfModal() {
+  async function openAddInfModal() {
     setSelectedInfIds([])
     setInfSearch('')
     setInfFilterTipo('')
     setInfFilterSize('')
     setModalAddInf(true)
+    // Cargar último precio de cada influencer disponible
+    try {
+      const data = await sql`
+        SELECT DISTINCT ON (ci.influencer_id)
+          ci.influencer_id,
+          ci.costo,
+          ci.tipo_facturacion,
+          c.nombre AS camp_nombre,
+          c.created_at
+        FROM campaign_influencers ci
+        JOIN campaigns c ON c.id = ci.campaign_id
+        WHERE ci.costo > 0
+        ORDER BY ci.influencer_id, c.created_at DESC
+      `
+      const map = {}
+      data.forEach(r => { map[r.influencer_id] = r })
+      setUltimosPrecios(map)
+    } catch (e) { console.error(e) }
   }
 
   function toggleInfSelection(id) {
@@ -1339,6 +1358,8 @@ export default function Campanas({ initialCamp = null }) {
               const igS = getSize(inf.ig_seguidores)
               const ttS = getSize(inf.tt_seguidores)
               const tipos = inf.tipos_contenido || []
+              const ultimo = ultimosPrecios[inf.id]
+              const ultimoPrecio = ultimo ? calcCosto(ultimo.costo, ultimo.tipo_facturacion) : null
               return (
                 <div key={inf.id} onClick={() => toggleInfSelection(inf.id)}
                   style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', cursor: 'pointer', borderBottom: '0.5px solid #F0F0EE', background: isSelected ? '#FEF9F9' : 'transparent' }}
@@ -1355,6 +1376,12 @@ export default function Campanas({ initialCamp = null }) {
                       {tipos.slice(0, 2).map(t => { const c = TIPO_COLORS[t] || TIPO_COLORS['Otros']; return <span key={t} style={{ background: c.bg, color: c.color, padding: '0 5px', borderRadius: 10 }}>{t}</span> })}
                     </div>
                   </div>
+                  {ultimoPrecio && (
+                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                      <div style={{ fontSize: 12.5, fontWeight: 500, color: '#1A1A1A' }}>{fmtMoney(ultimoPrecio, currentCamp.moneda)}</div>
+                      <div style={{ fontSize: 10, color: '#AAA', marginTop: 1 }}>último precio</div>
+                    </div>
+                  )}
                 </div>
               )
             })}
