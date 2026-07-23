@@ -508,6 +508,7 @@ export default function Campanas({ initialCamp = null }) {
   const [editCIModal, setEditCIModal] = useState(false)
   const [editCI, setEditCI] = useState(null)
   const [editCIForm, setEditCIForm] = useState(EMPTY_CI_EDIT)
+  const [ultimoPrecioCI, setUltimoPrecioCI] = useState(null)
 
   const [deleteCampId, setDeleteCampId] = useState(null)
   const [deleteCI, setDeleteCI] = useState(null)
@@ -839,7 +840,7 @@ export default function Campanas({ initialCamp = null }) {
     } catch (e) { console.error(e) }
   }
 
-  function openEditCI(inf) {
+  async function openEditCI(inf) {
     setEditCI(inf)
     setEditCIForm({
       costo: inf.costo, piezas: inf.piezas,
@@ -849,7 +850,22 @@ export default function Campanas({ initialCamp = null }) {
       boostcode: inf.boostcode || '',
       tipo_facturacion: inf.tipo_facturacion || 'sin_recargo',
     })
+    setUltimoPrecioCI(null)
     setEditCIModal(true)
+    // Buscar último precio en otras campañas (excluyendo la actual)
+    try {
+      const data = await sql`
+        SELECT ci.costo, ci.tipo_facturacion, c.nombre AS camp_nombre
+        FROM campaign_influencers ci
+        JOIN campaigns c ON c.id = ci.campaign_id
+        WHERE ci.influencer_id = ${inf.influencer_id}
+          AND ci.campaign_id != ${currentCamp.id}
+          AND ci.costo > 0
+        ORDER BY c.created_at DESC
+        LIMIT 1
+      `
+      if (data.length > 0) setUltimoPrecioCI(data[0])
+    } catch (e) { console.error(e) }
   }
 
   async function saveEditCI() {
@@ -1404,13 +1420,49 @@ export default function Campanas({ initialCamp = null }) {
           <div className="form-row-2">
             <div className="fg">
               <label className="label">Costo base ({currentCamp.moneda})</label>
-              <input className="input" type="number" value={editCIForm.costo} onChange={e => setEditCIForm(f => ({ ...f, costo: e.target.value }))} />
+              <input className="input" type="number" value={editCIForm.costo}
+                onChange={e => setEditCIForm(f => ({ ...f, costo: e.target.value }))} />
             </div>
             <div className="fg">
               <label className="label">Piezas</label>
-              <input className="input" type="number" value={editCIForm.piezas} onChange={e => setEditCIForm(f => ({ ...f, piezas: e.target.value }))} />
+              <input className="input" type="number" value={editCIForm.piezas}
+                onChange={e => setEditCIForm(f => ({ ...f, piezas: e.target.value }))} />
             </div>
           </div>
+
+          {/* Último precio — visible solo si costo está vacío o en 0 */}
+          {ultimoPrecioCI && (!(parseInt(editCIForm.costo) > 0)) && (
+            <div style={{
+              background: '#F7F7F5', border: '0.5px solid #E5E5E2', borderRadius: 10,
+              padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+            }}>
+              <div>
+                <div style={{ fontSize: 10.5, color: '#AAA', marginBottom: 3 }}>Último precio registrado</div>
+                <div style={{ fontSize: 14, fontWeight: 500 }}>
+                  {fmtMoney(calcCosto(ultimoPrecioCI.costo, ultimoPrecioCI.tipo_facturacion), currentCamp.moneda)}
+                </div>
+                <div style={{ fontSize: 11, color: '#AAA', marginTop: 1 }}>
+                  base {fmtMoney(ultimoPrecioCI.costo, currentCamp.moneda)}
+                  {ultimoPrecioCI.tipo_facturacion !== 'sin_recargo' && (
+                    <> · {ultimoPrecioCI.tipo_facturacion === 'honorarios' ? 'Boleta' : 'Factura IVA'}</>
+                  )}
+                  {' · '}{ultimoPrecioCI.camp_nombre}
+                </div>
+              </div>
+              <button
+                className="btn-ghost"
+                style={{ fontSize: 12, flexShrink: 0 }}
+                onClick={() => setEditCIForm(f => ({
+                  ...f,
+                  costo: ultimoPrecioCI.costo,
+                  tipo_facturacion: ultimoPrecioCI.tipo_facturacion || 'sin_recargo',
+                }))}
+              >
+                Usar este precio
+              </button>
+            </div>
+          )}
+
           <div className="fg">
             <label className="label">Tipo de facturación</label>
             <FacturacionToggle value={editCIForm.tipo_facturacion} onChange={v => setEditCIForm(f => ({ ...f, tipo_facturacion: v }))} />
@@ -1425,11 +1477,15 @@ export default function Campanas({ initialCamp = null }) {
           <VideoLinkFields form={editCIForm} setForm={setEditCIForm} />
           <div className="fg">
             <label className="label">Boostcode</label>
-            <input className="input" value={editCIForm.boostcode} onChange={e => setEditCIForm(f => ({ ...f, boostcode: e.target.value }))} placeholder="Ej: ABC123" style={{ fontFamily: 'monospace' }} />
+            <input className="input" value={editCIForm.boostcode}
+              onChange={e => setEditCIForm(f => ({ ...f, boostcode: e.target.value }))}
+              placeholder="Ej: ABC123" style={{ fontFamily: 'monospace' }} />
           </div>
           <div className="fg">
             <label className="label">Notas internas</label>
-            <textarea className="input" rows={2} value={editCIForm.notas} onChange={e => setEditCIForm(f => ({ ...f, notas: e.target.value }))} style={{ resize: 'vertical' }} />
+            <textarea className="input" rows={2} value={editCIForm.notas}
+              onChange={e => setEditCIForm(f => ({ ...f, notas: e.target.value }))}
+              style={{ resize: 'vertical' }} />
           </div>
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
             <button className="btn-ghost" onClick={() => setEditCIModal(false)}>Cancelar</button>
