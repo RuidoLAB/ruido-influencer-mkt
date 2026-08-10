@@ -5,6 +5,7 @@ const ALL_ITEMS = [
   { id: 'roster',    label: 'Roster',    icon: '◉' },
   { id: 'campanas',  label: 'Campañas',  icon: '◎' },
   { id: 'clientes',  label: 'Clientes',  icon: '◍' },
+  { id: 'servicios', label: 'Servicios', icon: '◐' },
 ]
 
 function useIsMobile() {
@@ -30,6 +31,7 @@ export default function Sidebar({ page, setPage, onLogout }) {
   const clientItems = [
     { id: 'clientes',  label: 'Clientes',  icon: '◍' },
     { id: 'campanas',  label: 'Campañas',  icon: '◎' },
+    { id: 'servicios', label: 'Servicios', icon: '◐' },
   ]
 
   // ─── MOBILE: barra inferior + menú deslizable ───
