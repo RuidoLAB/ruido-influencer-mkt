@@ -193,50 +193,56 @@ function BudgetBar({ usado, total }) {
 
 function BudgetSummary({ camp, isMobile }) {
   const usado = camp.influencers?.reduce((s, i) => s + calcCosto(i.costo, i.tipo_facturacion), 0) || 0
-  const restante = camp.budget - usado
-  const pct = camp.budget > 0 ? Math.min(100, Math.round((usado / camp.budget) * 100)) : 0
-  const statusColor = pct >= 100 ? '#A32D2D' : pct >= 90 ? '#854F0B' : '#3B6D11'
-  const statusBg = pct >= 100 ? '#FCEBEB' : pct >= 90 ? '#FAEEDA' : '#EAF3DE'
-  const barColor = pct >= 100 ? '#E24B4A' : pct >= 90 ? '#EF9F27' : '#639922'
+  const pct = Number(camp.utilizable_pct) || 100
+  // Budget utilizable: si es legacy usamos budget directamente, si no budget_total * pct
+  const budgetUtilizable = camp.es_legacy
+    ? Number(camp.budget) || 0
+    : Math.round((Number(camp.budget_total) || 0) * pct / 100)
+  const budgetTotal = camp.es_legacy ? null : Number(camp.budget_total) || 0
+  const margenPct = 100 - pct
+  const margenMonto = camp.es_legacy ? null : Math.round((Number(camp.budget_total) || 0) * margenPct / 100)
+  const restante = budgetUtilizable - usado
+  const usadoPct = budgetUtilizable > 0 ? Math.min(100, Math.round((usado / budgetUtilizable) * 100)) : 0
+  const barColor = usadoPct > 90 ? '#E8313A' : usadoPct > 70 ? '#F0A500' : '#639922'
+  const moneda = camp.moneda || 'CLP'
+
   return (
-    <div style={{
-      display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: 12,
-      background: '#F7F7F5', borderRadius: 12, padding: '14px 16px', marginBottom: 20,
-      border: '0.5px solid #E5E5E2',
-    }}>
-      <div>
-        <div style={{ fontSize: 10.5, color: '#AAA', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 4 }}>Budget</div>
-        <div style={{ fontSize: 20, fontWeight: 500 }}>{fmtMoney(camp.budget, camp.moneda)}</div>
-        <div style={{ fontSize: 11, color: '#AAA', marginTop: 2 }}>{camp.moneda}</div>
-      </div>
-      <div>
-        <div style={{ fontSize: 10.5, color: '#AAA', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 4 }}>Gastado</div>
-        <div style={{ fontSize: 20, fontWeight: 500 }}>{fmtMoney(usado, camp.moneda)}</div>
-        <div style={{ fontSize: 11, color: '#AAA', marginTop: 2 }}>{camp.influencers?.length || 0} influencers</div>
-      </div>
-      <div>
-        <div style={{ fontSize: 10.5, color: '#AAA', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 4 }}>Restante</div>
-        <div style={{ fontSize: 20, fontWeight: 500, color: statusColor }}>{fmtMoney(restante, camp.moneda)}</div>
-        <div style={{ fontSize: 11, marginTop: 2 }}>
-          <span style={{ background: statusBg, color: statusColor, padding: '1px 7px', borderRadius: 20 }}>{pct}% usado</span>
+    <div style={{ background: '#F7F7F5', border: '0.5px solid #E5E5E2', borderRadius: 12, padding: '14px 16px', marginBottom: 20 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : camp.es_legacy ? 'repeat(3,1fr)' : 'repeat(5,1fr)', gap: 12, marginBottom: 12 }}>
+        {!camp.es_legacy && budgetTotal > 0 && (
+          <div>
+            <div style={{ fontSize: 10.5, color: '#AAA', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 4 }}>Budget total</div>
+            <div style={{ fontSize: 18, fontWeight: 500 }}>{fmtMoney(budgetTotal, moneda)}</div>
+            <div style={{ fontSize: 10, color: '#AAA', marginTop: 1 }}>{pct}% util · {margenPct.toFixed(1)}% margen</div>
+          </div>
+        )}
+        {!camp.es_legacy && margenMonto > 0 && (
+          <div>
+            <div style={{ fontSize: 10.5, color: '#AAA', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 4 }}>Margen agencia</div>
+            <div style={{ fontSize: 18, fontWeight: 500, color: '#639922' }}>{fmtMoney(margenMonto, moneda)}</div>
+            <div style={{ fontSize: 10, color: '#AAA', marginTop: 1 }}>{margenPct.toFixed(1)}%</div>
+          </div>
+        )}
+        <div>
+          <div style={{ fontSize: 10.5, color: '#AAA', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 4 }}>
+            {camp.es_legacy ? 'Budget' : 'Utilizable'}
+          </div>
+          <div style={{ fontSize: 18, fontWeight: 500 }}>{fmtMoney(budgetUtilizable, moneda)}</div>
+          {!camp.es_legacy && <div style={{ fontSize: 10, color: '#AAA', marginTop: 1 }}>{pct}% del total</div>}
+        </div>
+        <div>
+          <div style={{ fontSize: 10.5, color: '#AAA', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 4 }}>Gastado</div>
+          <div style={{ fontSize: 18, fontWeight: 500 }}>{fmtMoney(usado, moneda)}</div>
+        </div>
+        <div>
+          <div style={{ fontSize: 10.5, color: '#AAA', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 4 }}>Disponible</div>
+          <div style={{ fontSize: 18, fontWeight: 500, color: restante < 0 ? '#E8313A' : '#1A1A1A' }}>{fmtMoney(restante, moneda)}</div>
         </div>
       </div>
-      <div>
-        <div style={{ fontSize: 10.5, color: '#AAA', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 4 }}>Alcance total</div>
-        <div style={{ fontSize: 20, fontWeight: 500 }}>
-          {fmtSeg(camp.influencers?.reduce((s, i) => {
-            const ig = camp.plataforma !== 'TikTok' ? Number(i.ig_seguidores || 0) : 0
-            const tt = camp.plataforma !== 'Instagram' ? Number(i.tt_seguidores || 0) : 0
-            return s + ig + tt
-          }, 0) || 0)}
-        </div>
-        <div style={{ fontSize: 11, color: '#AAA', marginTop: 2 }}>{camp.plataforma || 'Ambas'}</div>
+      <div style={{ height: 6, background: '#E5E5E2', borderRadius: 3, overflow: 'hidden' }}>
+        <div style={{ height: '100%', width: usadoPct + '%', background: barColor, borderRadius: 3, transition: 'width .3s' }} />
       </div>
-      <div style={{ gridColumn: '1 / -1' }}>
-        <div style={{ height: 6, background: '#E5E5E2', borderRadius: 3, overflow: 'hidden' }}>
-          <div style={{ height: '100%', width: pct + '%', background: barColor, borderRadius: 3 }} />
-        </div>
-      </div>
+      <div style={{ fontSize: 11, color: '#AAA', marginTop: 4, textAlign: 'right' }}>{usadoPct}% utilizado</div>
     </div>
   )
 }
@@ -245,8 +251,9 @@ const EMPTY_CAMP = {
   nombre: '', cliente: '', client_id: '', budget: '', moneda: 'CLP',
   brief: '', plataforma: 'Ambas', artista: '', cancion: '',
   fecha_inicio: '', fecha_termino: '', reporte_url_tt: '', reporte_url_ig: '',
-  tipo: 'Estándar', contenidos_count: '', views_logradas: '',
+  tipo: 'Influencer MKT', contenidos_count: '', views_logradas: '',
   views_min: '', views_max: '',
+  service_id: '', utilizable_pct: '', solicitado_por: '',
 }
 const EMPTY_CI_EDIT = { costo: '', piezas: '1', estado: 'Contactado', notas: '', video_link_tt: '', video_link_ig: '', boostcode: '', tipo_facturacion: 'sin_recargo' }
 
@@ -295,7 +302,7 @@ function ClippingBar({ logradas, min, max }) {
 }
 
 // ─── FORM FIELDS — definido FUERA del componente para evitar re-mount ───
-function CampFormFields({ form, setForm, error, clientsList }) {
+function CampFormFields({ form, setForm, error, clientsList, servicesList }) {
   const fPlat = form.plataforma
   const fShowTT = fPlat === 'Ambas' || fPlat === 'TikTok'
   const fShowIG = fPlat === 'Ambas' || fPlat === 'Instagram'
@@ -303,23 +310,31 @@ function CampFormFields({ form, setForm, error, clientsList }) {
   const isClipping = form.tipo === 'Clipping'
   const isPlaylisting = form.tipo === 'Playlisting'
 
+  // Calcular utilizable y margen en tiempo real
+  const selectedService = servicesList?.find(s => String(s.id) === String(form.service_id))
+  const pct = selectedService ? Number(selectedService.utilizable_pct) : null
+  const budgetNum = parseInt(form.budget) || 0
+  const utilizable = pct != null ? Math.round(budgetNum * pct / 100) : null
+  const margen = pct != null ? Math.round(budgetNum * (100 - pct) / 100) : null
+
   return (
     <>
+      {/* Servicio */}
       <div className="fg">
-        <label className="label">Tipo de campaña</label>
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-          {TIPOS_CAMPANA.map(t => (
-            <div key={t} onClick={() => setForm(f => ({ ...f, tipo: t }))}
-              style={{
-                flex: '1 1 auto', padding: '8px 10px', borderRadius: 8, cursor: 'pointer',
-                textAlign: 'center', fontSize: 12, userSelect: 'none', transition: 'all .12s',
-                background: form.tipo === t ? '#1A1A1A' : '#F7F7F5',
-                color: form.tipo === t ? '#fff' : '#888',
-                border: `0.5px solid ${form.tipo === t ? '#1A1A1A' : '#E5E5E2'}`,
-              }}
-            >{t}</div>
-          ))}
-        </div>
+        <label className="label">Servicio</label>
+        <select className="input" value={form.service_id}
+          onChange={e => {
+            const svc = servicesList?.find(s => String(s.id) === e.target.value)
+            setForm(f => ({
+              ...f,
+              service_id: e.target.value,
+              tipo: svc ? svc.nombre : f.tipo,
+              utilizable_pct: svc ? svc.utilizable_pct : f.utilizable_pct,
+            }))
+          }}>
+          <option value="">Selecciona un servicio</option>
+          {(servicesList || []).map(s => <option key={s.id} value={s.id}>{s.nombre}</option>)}
+        </select>
       </div>
       <div className="fg">
         <label className="label">Nombre de campaña</label>
@@ -351,7 +366,7 @@ function CampFormFields({ form, setForm, error, clientsList }) {
       </div>
       <div className="form-row-2">
         <div className="fg">
-          <label className="label">Budget</label>
+          <label className="label">Budget Total (lo que cobra la agencia)</label>
           <input className="input" type="number" value={form.budget}
             onChange={e => setForm(f => ({ ...f, budget: e.target.value }))} placeholder="0" />
         </div>
@@ -362,6 +377,28 @@ function CampFormFields({ form, setForm, error, clientsList }) {
             <option>CLP</option><option>USD</option>
           </select>
         </div>
+      </div>
+      {pct != null && budgetNum > 0 && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, background: '#F7F7F5', border: '0.5px solid #E5E5E2', borderRadius: 10, padding: '10px 12px', marginBottom: 4 }}>
+          <div>
+            <div style={{ fontSize: 10, color: '#AAA', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 2 }}>Utilizable ({pct}%)</div>
+            <div style={{ fontSize: 13, fontWeight: 500 }}>${utilizable?.toLocaleString('es-CL')}</div>
+          </div>
+          <div>
+            <div style={{ fontSize: 10, color: '#AAA', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 2 }}>Margen ({(100-pct).toFixed(1)}%)</div>
+            <div style={{ fontSize: 13, fontWeight: 500, color: '#639922' }}>${margen?.toLocaleString('es-CL')}</div>
+          </div>
+          <div>
+            <div style={{ fontSize: 10, color: '#AAA', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 2 }}>Total</div>
+            <div style={{ fontSize: 13, fontWeight: 500 }}>${budgetNum.toLocaleString('es-CL')}</div>
+          </div>
+        </div>
+      )}
+      <div className="fg">
+        <label className="label">Solicitado por (opcional)</label>
+        <input className="input" value={form.solicitado_por}
+          onChange={e => setForm(f => ({ ...f, solicitado_por: e.target.value }))}
+          placeholder="Ej: Juan Pérez" />
       </div>
       {!isPlaylisting && (
         <div className="fg">
@@ -482,6 +519,7 @@ export default function Campanas({ initialCamp = null }) {
   const [currentCamp, setCurrentCamp] = useState(initialCamp)
   const [roster, setRoster] = useState([])
   const [clientsList, setClientsList] = useState([])
+  const [servicesList, setServicesList] = useState([])
   const [tab, setTab] = useState('Activas')
   const [filterAnio, setFilterAnio] = useState('')
   const [sortOrder, setSortOrder] = useState('reciente')
@@ -543,6 +581,7 @@ export default function Campanas({ initialCamp = null }) {
         SELECT
           c.*,
           cl.nombre AS client_nombre, cl.color AS client_color,
+          s.nombre AS service_nombre,
           ci.id AS ci_id, ci.costo, ci.piezas,
           ci.estado AS ci_estado, ci.notas AS ci_notas,
           ci.video_link_tt, ci.video_link_ig,
@@ -554,6 +593,7 @@ export default function Campanas({ initialCamp = null }) {
           i.tipos_contenido, i.avatar_url
         FROM campaigns c
         LEFT JOIN clients cl ON cl.id = c.client_id
+        LEFT JOIN services s ON s.id = c.service_id
         LEFT JOIN campaign_influencers ci ON ci.campaign_id = c.id
         LEFT JOIN influencers i ON i.id = ci.influencer_id
         ORDER BY c.created_at DESC
@@ -573,11 +613,17 @@ export default function Campanas({ initialCamp = null }) {
             fecha_inicio: row.fecha_inicio || '', fecha_termino: row.fecha_termino || '',
             reporte_url_tt: row.reporte_url_tt || '',
             reporte_url_ig: row.reporte_url_ig || '',
-            tipo: row.tipo || 'Estándar',
+            tipo: row.tipo || 'Influencer MKT',
             contenidos_count: row.contenidos_count || 0,
             views_logradas: row.views_logradas || 0,
             views_min: row.views_min || 0,
             views_max: row.views_max || 0,
+            service_id: row.service_id || null,
+            service_nombre: row.service_nombre || row.tipo || '',
+            budget_total: row.budget_total || 0,
+            utilizable_pct: row.utilizable_pct != null ? Number(row.utilizable_pct) : 100,
+            solicitado_por: row.solicitado_por || '',
+            es_legacy: row.es_legacy || false,
             influencers: [],
           }
         }
@@ -617,12 +663,14 @@ export default function Campanas({ initialCamp = null }) {
 
   async function fetchRosterAndClients() {
     try {
-      const [rosterData, clientsData] = await Promise.all([
+      const [rosterData, clientsData, svcsData] = await Promise.all([
         sql`SELECT * FROM influencers WHERE estado = 'Activo' ORDER BY (ig_seguidores + tt_seguidores) DESC`,
-        sql`SELECT id, nombre, color FROM clients ORDER BY nombre ASC`
+        sql`SELECT id, nombre, color FROM clients ORDER BY nombre ASC`,
+        sql`SELECT id, nombre, utilizable_pct FROM services WHERE activo = true ORDER BY nombre ASC`,
       ])
       setRoster(rosterData)
       setClientsList(clientsData)
+      setServicesList(svcsData)
     } catch (e) { console.error(e) }
   }
 
@@ -645,22 +693,27 @@ export default function Campanas({ initialCamp = null }) {
     setSavingCamp(true)
     try {
       await sql`
-        INSERT INTO campaigns (nombre, cliente, client_id, budget, moneda, brief, plataforma, share_token, artista, cancion, fecha_inicio, fecha_termino, reporte_url_tt, reporte_url_ig, tipo, contenidos_count, views_logradas, views_min, views_max)
+        INSERT INTO campaigns (nombre, cliente, client_id, budget, budget_total, moneda, brief, plataforma, share_token, artista, cancion, fecha_inicio, fecha_termino, reporte_url_tt, reporte_url_ig, tipo, contenidos_count, views_logradas, views_min, views_max, service_id, utilizable_pct, solicitado_por, es_legacy)
         VALUES (
           ${campForm.nombre},
           ${campForm.client_id ? (clientsList.find(c => c.id === campForm.client_id)?.nombre || '') : campForm.cliente},
           ${campForm.client_id || null},
+          ${parseInt(campForm.budget) || 0},
           ${parseInt(campForm.budget) || 0},
           ${campForm.moneda}, ${campForm.brief},
           ${campForm.plataforma}, ${crypto.randomUUID()},
           ${campForm.artista}, ${campForm.cancion},
           ${campForm.fecha_inicio || null}, ${campForm.fecha_termino || null},
           ${campForm.reporte_url_tt || ''}, ${campForm.reporte_url_ig || ''},
-          ${campForm.tipo || 'Estándar'},
+          ${campForm.tipo || 'Influencer MKT'},
           ${parseInt(campForm.contenidos_count) || 0},
           ${parseInt(campForm.views_logradas) || 0},
           ${parseInt(campForm.views_min) || 0},
-          ${parseInt(campForm.views_max) || 0}
+          ${parseInt(campForm.views_max) || 0},
+          ${campForm.service_id ? parseInt(campForm.service_id) : null},
+          ${campForm.utilizable_pct ? parseFloat(campForm.utilizable_pct) : 100},
+          ${campForm.solicitado_por || ''},
+          false
         )
       `
       setModalNewCamp(false)
@@ -685,11 +738,14 @@ export default function Campanas({ initialCamp = null }) {
       fecha_termino: currentCamp.fecha_termino || '',
       reporte_url_tt: currentCamp.reporte_url_tt || '',
       reporte_url_ig: currentCamp.reporte_url_ig || '',
-      tipo: currentCamp.tipo || 'Estándar',
+      tipo: currentCamp.tipo || 'Influencer MKT',
       contenidos_count: currentCamp.contenidos_count || '',
       views_logradas: currentCamp.views_logradas || '',
       views_min: currentCamp.views_min || '',
       views_max: currentCamp.views_max || '',
+      service_id: currentCamp.service_id ? String(currentCamp.service_id) : '',
+      utilizable_pct: currentCamp.utilizable_pct || '',
+      solicitado_por: currentCamp.solicitado_por || '',
     })
     setEditCampFormError('')
     setEditCampModal(true)
@@ -708,6 +764,7 @@ export default function Campanas({ initialCamp = null }) {
           cliente = ${editCampForm.client_id ? (clientsList.find(c => c.id === editCampForm.client_id)?.nombre || editCampForm.cliente) : editCampForm.cliente},
           client_id = ${editCampForm.client_id || null},
           budget = ${parseInt(editCampForm.budget) || 0},
+          budget_total = ${parseInt(editCampForm.budget) || 0},
           moneda = ${editCampForm.moneda},
           plataforma = ${editCampForm.plataforma},
           brief = ${editCampForm.brief},
@@ -717,11 +774,13 @@ export default function Campanas({ initialCamp = null }) {
           fecha_termino = ${editCampForm.fecha_termino || null},
           reporte_url_tt = ${editCampForm.reporte_url_tt || ''},
           reporte_url_ig = ${editCampForm.reporte_url_ig || ''},
-          tipo = ${editCampForm.tipo || 'Estándar'},
+          tipo = ${editCampForm.tipo || 'Influencer MKT'},
           contenidos_count = ${parseInt(editCampForm.contenidos_count) || 0},
           views_logradas = ${parseInt(editCampForm.views_logradas) || 0},
           views_min = ${parseInt(editCampForm.views_min) || 0},
-          views_max = ${parseInt(editCampForm.views_max) || 0}
+          views_max = ${parseInt(editCampForm.views_max) || 0},
+          service_id = ${editCampForm.service_id ? parseInt(editCampForm.service_id) : null},
+          solicitado_por = ${editCampForm.solicitado_por || ''}
         WHERE id = ${currentCamp.id}
       `
       setEditCampModal(false)
@@ -1321,7 +1380,7 @@ export default function Campanas({ initialCamp = null }) {
 
         {/* Modals */}
         <Modal open={editCampModal} onClose={() => setEditCampModal(false)} title="Editar campaña">
-          <CampFormFields form={editCampForm} setForm={setEditCampForm} error={editCampFormError} clientsList={clientsList} />
+          <CampFormFields form={editCampForm} setForm={setEditCampForm} error={editCampFormError} clientsList={clientsList} servicesList={servicesList} />
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
             <button className="btn-ghost" onClick={() => setEditCampModal(false)}>Cancelar</button>
             <button className="btn-red" onClick={saveEditCamp} disabled={savingEditCamp}>
@@ -1577,7 +1636,7 @@ export default function Campanas({ initialCamp = null }) {
             const ec = ESTADO_CAMP_COLORS[camp.estado] || ESTADO_CAMP_COLORS['Activa']
             const isInactive = camp.estado === 'Cerrada' || camp.estado === 'Cancelada'
             const clientColor = camp.client_color || '#AAA'
-            const isEspecialCamp = camp.tipo !== 'Estándar'
+            const isEspecialCamp = camp.tipo === 'Nano Blast' || camp.tipo === 'Clipping' || camp.tipo === 'Playlisting'
             return (
               <div key={camp.id} className="card"
                 style={{ padding: 18, cursor: 'pointer', transition: 'border-color .15s', opacity: isInactive ? 0.75 : 1 }}
@@ -1622,7 +1681,7 @@ export default function Campanas({ initialCamp = null }) {
       )}
 
       <Modal open={modalNewCamp} onClose={() => setModalNewCamp(false)} title="Nueva campaña">
-        <CampFormFields form={campForm} setForm={setCampForm} error={campFormError} clientsList={clientsList} />
+        <CampFormFields form={campForm} setForm={setCampForm} error={campFormError} clientsList={clientsList} servicesList={servicesList} />
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
           <button className="btn-ghost" onClick={() => setModalNewCamp(false)}>Cancelar</button>
           <button className="btn-red" onClick={saveCamp} disabled={savingCamp}>{savingCamp ? 'Creando...' : 'Crear campaña'}</button>
