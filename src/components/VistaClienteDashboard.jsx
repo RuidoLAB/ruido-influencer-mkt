@@ -204,6 +204,7 @@ export default function VistaClienteDashboard({ token }) {
           c.fecha_inicio, c.fecha_termino, c.plataforma,
           c.reporte_url_tt, c.reporte_url_ig,
           c.tipo, c.contenidos_count, c.views_logradas, c.views_min, c.views_max,
+          c.budget_total, c.utilizable_pct, c.solicitado_por, c.es_legacy, c.moneda,
           c.created_at,
           COUNT(DISTINCT ci.id) AS total_influencers,
           COUNT(DISTINCT CASE WHEN ci.video_link_tt != '' OR ci.video_link_ig != '' THEN ci.id END) AS videos_publicados,
@@ -331,6 +332,16 @@ export default function VistaClienteDashboard({ token }) {
             {selectedCamp.artista && (
               <p style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.5)' }}>
                 {selectedCamp.artista}{selectedCamp.cancion ? ` — "${selectedCamp.cancion}"` : ''}
+              </p>
+            )}
+            {selectedCamp.solicitado_por && (
+              <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>
+                Solicitado por: <span style={{ color: 'rgba(255,255,255,0.65)' }}>{selectedCamp.solicitado_por}</span>
+              </p>
+            )}
+            {!selectedCamp.es_legacy && selectedCamp.budget_total > 0 && (
+              <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>
+                Budget: <span style={{ color: 'rgba(255,255,255,0.75)', fontWeight: 500 }}>${Number(selectedCamp.budget_total).toLocaleString('es-CL')} {selectedCamp.moneda || 'CLP'}</span>
               </p>
             )}
           </div>
@@ -689,8 +700,9 @@ export default function VistaClienteDashboard({ token }) {
               const plat = camp.plataforma || 'Ambas'
               const hasTT = (plat === 'Ambas' || plat === 'TikTok') && camp.reporte_url_tt
               const hasIG = (plat === 'Ambas' || plat === 'Instagram') && camp.reporte_url_ig
-              const isEspecialCamp = camp.tipo !== 'Estándar'
+              const isEspecialCamp = camp.tipo === 'Nano Blast' || camp.tipo === 'Clipping' || camp.tipo === 'Playlisting'
               const isPlaylistingCamp = camp.tipo === 'Playlisting'
+              const showBudget = !camp.es_legacy && Number(camp.budget_total) > 0
 
               if (isMobile) {
                 return (
@@ -703,12 +715,14 @@ export default function VistaClienteDashboard({ token }) {
                         <div style={{ fontSize: 11.5, color: '#AAA' }}>
                           {camp.artista ? <>{camp.artista}{camp.cancion ? ` — "${camp.cancion}"` : ''}</> : 'Sin artista asignado'}
                         </div>
+                        {camp.solicitado_por && <div style={{ fontSize: 11, color: '#BBB', marginTop: 2 }}>Por: {camp.solicitado_por}</div>}
                       </div>
                       <span style={{ fontSize: 18, color: '#CCC', flexShrink: 0 }}>›</span>
                     </div>
                     <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginBottom: 10 }}>
                       <span style={{ background: ec.bg, color: ec.color, padding: '2px 8px', borderRadius: 20, fontSize: 10.5 }}>{camp.estado}</span>
                       {isEspecialCamp && <span style={{ fontSize: 10, background: '#1A1A1A', color: '#fff', padding: '2px 8px', borderRadius: 20 }}>{camp.tipo}</span>}
+                      {showBudget && <span style={{ fontSize: 10.5, color: '#888' }}>${Number(camp.budget_total).toLocaleString('es-CL')} {camp.moneda || 'CLP'}</span>}
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
                       <div style={{ display: 'flex', gap: 16 }}>
@@ -766,10 +780,11 @@ export default function VistaClienteDashboard({ token }) {
                       <span style={{ background: ec.bg, color: ec.color, padding: '1px 8px', borderRadius: 20, fontSize: 10.5 }}>{camp.estado}</span>
                       {isEspecialCamp && <span style={{ fontSize: 10, background: '#1A1A1A', color: '#fff', padding: '1px 7px', borderRadius: 20 }}>{camp.tipo}</span>}
                     </div>
-                    <div style={{ fontSize: 12, color: '#AAA' }}>
-                      {camp.artista && <span>{camp.artista}</span>}
-                      {camp.cancion && <span style={{ fontStyle: 'italic' }}> — "{camp.cancion}"</span>}
+                    <div style={{ fontSize: 12, color: '#AAA', display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                      {camp.artista && <span>{camp.artista}{camp.cancion ? ` — "${camp.cancion}"` : ''}</span>}
                       {!camp.artista && !camp.cancion && <span>Sin artista asignado</span>}
+                      {camp.solicitado_por && <span>· Por: {camp.solicitado_por}</span>}
+                      {showBudget && <span>· ${Number(camp.budget_total).toLocaleString('es-CL')} {camp.moneda || 'CLP'}</span>}
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: 20, flexShrink: 0, alignItems: 'center' }}>
