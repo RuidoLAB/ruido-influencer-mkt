@@ -151,7 +151,8 @@ export default function VistaCliente({ token }) {
           id, nombre AS camp_nombre, cliente, plataforma,
           reporte_url_tt, reporte_url_ig,
           tipo, contenidos_count, views_logradas, views_min, views_max,
-          artista, cancion
+          artista, cancion, budget_total, utilizable_pct,
+          solicitado_por, es_legacy, moneda
         FROM campaigns
         WHERE share_token = ${t} AND share_active = true
         LIMIT 1
@@ -181,6 +182,10 @@ export default function VistaCliente({ token }) {
           tipo: 'Playlisting',
           artista: campInfo.artista || '',
           cancion: campInfo.cancion || '',
+          solicitado_por: campInfo.solicitado_por || '',
+          budget_total: campInfo.budget_total || 0,
+          es_legacy: campInfo.es_legacy || false,
+          moneda: campInfo.moneda || 'CLP',
           playlists,
           influencers: [],
         })
@@ -202,6 +207,10 @@ export default function VistaCliente({ token }) {
           views_max: campInfo.views_max || 0,
           artista: campInfo.artista || '',
           cancion: campInfo.cancion || '',
+          solicitado_por: campInfo.solicitado_por || '',
+          budget_total: campInfo.budget_total || 0,
+          es_legacy: campInfo.es_legacy || false,
+          moneda: campInfo.moneda || 'CLP',
           influencers: [],
         })
         setLoading(false)
@@ -215,6 +224,7 @@ export default function VistaCliente({ token }) {
           c.reporte_url_tt, c.reporte_url_ig,
           c.tipo, c.contenidos_count, c.views_logradas,
           c.artista, c.cancion,
+          c.budget_total, c.es_legacy, c.solicitado_por, c.moneda,
           i.nombre,
           i.ig_usuario, i.ig_seguidores, i.ig_link,
           i.tt_usuario, i.tt_seguidores, i.tt_link,
@@ -232,11 +242,15 @@ export default function VistaCliente({ token }) {
         plataforma: rows[0].plataforma || 'Ambas',
         reporte_url_tt: rows[0].reporte_url_tt || '',
         reporte_url_ig: rows[0].reporte_url_ig || '',
-        tipo: rows[0].tipo || 'Estándar',
+        tipo: rows[0].tipo || 'Influencer MKT',
         contenidos_count: rows[0].contenidos_count || 0,
         views_logradas: rows[0].views_logradas || 0,
         artista: rows[0].artista || '',
         cancion: rows[0].cancion || '',
+        solicitado_por: rows[0].solicitado_por || '',
+        budget_total: rows[0].budget_total || 0,
+        es_legacy: rows[0].es_legacy || false,
+        moneda: rows[0].moneda || 'CLP',
         influencers: rows.sort((a, b) =>
           (Number(b.ig_seguidores) + Number(b.tt_seguidores)) -
           (Number(a.ig_seguidores) + Number(a.tt_seguidores))
@@ -316,6 +330,16 @@ export default function VistaCliente({ token }) {
               {camp.artista && <span> · {camp.artista}{camp.cancion ? ` — "${camp.cancion}"` : ''}</span>}
               {!isPlaylisting && plat !== 'Ambas' && <span style={{ marginLeft: 8, background: 'rgba(255,255,255,0.1)', padding: '1px 8px', borderRadius: 20, fontSize: 11 }}>{plat}</span>}
             </p>
+            {camp.solicitado_por && (
+              <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginTop: 3 }}>
+                Solicitado por: <span style={{ color: 'rgba(255,255,255,0.65)' }}>{camp.solicitado_por}</span>
+              </p>
+            )}
+            {!camp.es_legacy && Number(camp.budget_total) > 0 && (
+              <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginTop: 3 }}>
+                Budget: <span style={{ color: 'rgba(255,255,255,0.75)', fontWeight: 500 }}>${Number(camp.budget_total).toLocaleString('es-CL')} {camp.moneda || 'CLP'}</span>
+              </p>
+            )}
           </div>
           {hasAnyReporte && (
             <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
