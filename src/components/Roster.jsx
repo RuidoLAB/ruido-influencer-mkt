@@ -3,8 +3,6 @@ import sql from '../lib/db'
 import Modal from './Modal'
 import ImportarCSV from './ImportarCSV'
 
-const TIPOS = ['Bailes', 'Reviewers', 'Humor', 'Lifestyle', 'Música', 'Gaming', 'Moda', 'Fitness', 'Viajes', 'Otros']
-
 const TIPO_COLORS = {
   Bailes:    { bg: '#EEEDFE', color: '#3C3489' },
   Reviewers: { bg: '#E6F1FB', color: '#0C447C' },
@@ -128,12 +126,12 @@ function TiposBadges({ tipos, max }) {
   )
 }
 
-function TiposCheckboxes({ selected, onChange }) {
+function TiposCheckboxes({ selected, onChange, categorias = [] }) {
   return (
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-      {TIPOS.map(t => {
+      {categorias.map(t => {
         const isSelected = selected.includes(t)
-        const c = TIPO_COLORS[t] || TIPO_COLORS['Otros']
+        const c = TIPO_COLORS[t] || { bg: '#F1EFE8', color: '#444441' }
         return (
           <div key={t}
             onClick={() => {
@@ -370,6 +368,7 @@ function InfluencerPanel({ inf, index, isMobile, onClose, onEdit }) {
 export default function Roster() {
   const isMobile = useIsMobile()
   const [influencers, setInfluencers] = useState([])
+  const [categorias, setCategorias] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [filterTipo, setFilterTipo] = useState('')
@@ -395,12 +394,12 @@ export default function Roster() {
   async function fetchInfluencers() {
     setLoading(true)
     try {
-      const data = await sql`
-        SELECT *, tt_seguidores AS total_seguidores
-        FROM influencers
-        ORDER BY tt_seguidores DESC
-      `
+      const [data, cats] = await Promise.all([
+        sql`SELECT *, tt_seguidores AS total_seguidores FROM influencers ORDER BY tt_seguidores DESC`,
+        sql`SELECT nombre FROM categorias_influencer WHERE activo = true ORDER BY nombre ASC`,
+      ])
       setInfluencers(data)
+      setCategorias(cats.map(c => c.nombre))
     } catch (e) { console.error(e) }
     setLoading(false)
   }
@@ -569,7 +568,7 @@ export default function Roster() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8, background: '#fff', border: '0.5px solid #E5E5E2', borderRadius: 10, padding: 12 }}>
               <select className="input" value={filterTipo} onChange={e => setFilterTipo(e.target.value)} style={{ minHeight: 42 }}>
                 <option value="">Todos los tipos</option>
-                {TIPOS.map(t => <option key={t}>{t}</option>)}
+                {categorias.map(t => <option key={t}>{t}</option>)}
               </select>
               <select className="input" value={filterSize} onChange={e => setFilterSize(e.target.value)} style={{ minHeight: 42 }}>
                 <option value="">Todos los tamaños</option>
@@ -598,7 +597,7 @@ export default function Roster() {
             style={{ minWidth: 220, flex: 1, maxWidth: 300 }} />
           <select className="input" value={filterTipo} onChange={e => setFilterTipo(e.target.value)}>
             <option value="">Todos los tipos</option>
-            {TIPOS.map(t => <option key={t}>{t}</option>)}
+            {categorias.map(t => <option key={t}>{t}</option>)}
           </select>
           <select className="input" value={filterSize} onChange={e => setFilterSize(e.target.value)}>
             <option value="">Todos los tamaños</option>
@@ -820,7 +819,7 @@ export default function Roster() {
         </div>
         <div className="fg">
           <label className="label">Categorías de contenido</label>
-          <TiposCheckboxes selected={form.tipos_contenido} onChange={tipos => setForm(f => ({ ...f, tipos_contenido: tipos }))} />
+          <TiposCheckboxes selected={form.tipos_contenido} onChange={tipos => setForm(f => ({ ...f, tipos_contenido: tipos }))} categorias={categorias} />
           {form.tipos_contenido.length === 0 && <div style={{ fontSize: 11, color: '#CCC', marginTop: 4 }}>Selecciona al menos una categoría</div>}
         </div>
         <div className="fg">
