@@ -116,8 +116,10 @@ export default function Dashboard({ onNavigate }) {
             )) AS pagos_raw
           FROM influencers i
           JOIN campaign_influencers ci ON ci.influencer_id = i.id
+          JOIN campaigns c ON c.id = ci.campaign_id
           WHERE ci.estado_pago != 'Pagado'
             AND ci.costo > 0
+            AND c.estado IN ('Activa', 'Cerrada')
           GROUP BY i.id, i.nombre
         `,
       ])
