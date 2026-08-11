@@ -648,10 +648,12 @@ export default function Campanas({ initialCamp = null }) {
       })
       const list = Object.values(grouped).map(camp => ({
         ...camp,
-        influencers: camp.influencers.sort((a, b) =>
-          (Number(b.ig_seguidores) + Number(b.tt_seguidores)) -
-          (Number(a.ig_seguidores) + Number(a.tt_seguidores))
-        )
+        influencers: camp.influencers.sort((a, b) => {
+          if (camp.plataforma === 'Instagram') {
+            return Number(b.ig_seguidores) - Number(a.ig_seguidores)
+          }
+          return Number(b.tt_seguidores) - Number(a.tt_seguidores)
+        })
       }))
       setCamps(list)
       if (currentCamp) {
@@ -993,6 +995,11 @@ export default function Campanas({ initialCamp = null }) {
       getSize(inf.tt_seguidores).label === infFilterSize
     )
     return matchSearch && matchTipo && matchSize
+  }).sort((a, b) => {
+    if (currentCamp?.plataforma === 'Instagram') {
+      return Number(b.ig_seguidores) - Number(a.ig_seguidores)
+    }
+    return Number(b.tt_seguidores) - Number(a.tt_seguidores)
   })
 
   const isReadOnly = currentCamp && (currentCamp.estado === 'Cerrada' || currentCamp.estado === 'Cancelada')
