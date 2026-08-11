@@ -2,19 +2,21 @@ import { useState, useRef } from 'react'
 import sql from '../lib/db'
 import Modal from './Modal'
 
-const TIPOS_VALIDOS = ['Bailes', 'Reviewers', 'Humor', 'Lifestyle', 'Música', 'Gaming', 'Moda', 'Fitness', 'Viajes', 'Otros']
-
 const TIPO_COLORS = {
   Bailes:    { bg: '#EEEDFE', color: '#3C3489' },
   Reviewers: { bg: '#E6F1FB', color: '#0C447C' },
   Humor:     { bg: '#FAEEDA', color: '#633806' },
   Lifestyle: { bg: '#E1F5EE', color: '#085041' },
-  Música:    { bg: '#FAECE7', color: '#712B13' },
+  'Música':  { bg: '#FAECE7', color: '#712B13' },
   Gaming:    { bg: '#FBEAF0', color: '#72243E' },
   Moda:      { bg: '#FEF0FB', color: '#6B1560' },
   Fitness:   { bg: '#E8F5E9', color: '#1B5E20' },
   Viajes:    { bg: '#E3F2FD', color: '#0D47A1' },
   Otros:     { bg: '#F1EFE8', color: '#444441' },
+}
+
+function catColor(t) {
+  return TIPO_COLORS[t] || { bg: '#F1EFE8', color: '#444441' }
 }
 
 function fmtSeg(n) {
@@ -49,7 +51,8 @@ function parseCSV(text) {
   return rows
 }
 
-function mapRow(row) {
+// categorias: lista de nombres válidos desde DB (puede ser vacía → acepta todo)
+function mapRow(row, categorias) {
   const get = (...keys) => {
     for (const k of keys) {
       if (row[k] !== undefined && row[k] !== '') return row[k]
@@ -63,13 +66,23 @@ function mapRow(row) {
   const nombreRaw = ttUser || igUser || ''
   const nombre = nombreRaw.replace(/^@/, '')
   const catRaw = get('categorias', 'categoria', 'categories', 'category', 'tipos_contenido')
-  const tipos = catRaw
-    ? catRaw.split(',').map(c => {
-        const trimmed = c.trim()
-        const match = TIPOS_VALIDOS.find(t => t.toLowerCase() === trimmed.toLowerCase())
-        return match || 'Otros'
-      }).filter((v, i, arr) => arr.indexOf(v) === i)
-    : ['Otros']
+
+  let tipos = []
+  if (catRaw) {
+    tipos = catRaw.split(',').map(c => c.trim()).filter(Boolean)
+    // Si tenemos lista de categorías de la DB, hacer match case-insensitive
+    // Si no hay match exacto, buscar case-insensitive; si tampoco, usar el valor tal cual
+    if (categorias.length > 0) {
+      tipos = tipos.map(t => {
+        const match = categorias.find(c => c.toLowerCase() === t.toLowerCase())
+        return match || t  // si no coincide, se guarda tal cual (no forzamos 'Otros')
+      })
+    }
+    // Deduplicar
+    tipos = tipos.filter((v, i, arr) => arr.indexOf(v) === i)
+  }
+  if (tipos.length === 0) tipos = ['Otros']
+
   return {
     nombre: nombre || 'Sin nombre',
     tt_usuario: ttUser,
@@ -99,9 +112,10 @@ export default function ImportarCSV({ onDone }) {
   const [imported, setImported] = useState(0)
   const [skipped, setSkipped] = useState(0)
   const [skippedNames, setSkippedNames] = useState([])
+  const [categorias, setCategorias] = useState([])
   const fileRef = useRef()
 
-  function handleOpen() {
+  async function handleOpen() {
     setStep('upload')
     setPreview([])
     setErrors([])
@@ -110,6 +124,21 @@ export default function ImportarCSV({ onDone }) {
     setSkipped(0)
     setSkippedNames([])
     setOpen(true)
+    // Cargar categorías desde la DB al abrir
+    try {
+      const data = await sql`SELECT nombre FROM categorias_influencer WHERE activo = true ORDER BY nombre ASC`
+      setCategorias(data.map(c => c.nombre))
+    } catch (e) {
+      console.error(e)
+      setCategorias([]) // si falla, acepta todo
+    }
+  }
+
+  function handleClose() {
+    setOpen(false)
+    setStep('upload')
+    setPreview([])
+    setErrors([])
   }
 
   function handleFile(e) {
@@ -123,7 +152,7 @@ export default function ImportarCSV({ onDone }) {
         setErrors(['No se encontraron filas válidas en el CSV.'])
         return
       }
-      const mapped = rows.map(mapRow)
+      const mapped = rows.map(r => mapRow(r, categorias))
       const errs = []
       mapped.forEach((r, i) => {
         if (!r.tt_usuario && !r.ig_usuario) {
@@ -178,11 +207,6 @@ export default function ImportarCSV({ onDone }) {
     onDone?.()
   }
 
-  function handleClose() {
-    setOpen(false)
-    if (step === 'done') onDone?.()
-  }
-
   return (
     <>
       <button className="btn-ghost" onClick={handleOpen}>↑ Importar CSV</button>
@@ -192,25 +216,29 @@ export default function ImportarCSV({ onDone }) {
         {/* UPLOAD */}
         {step === 'upload' && (
           <div>
-            <p style={{ fontSize: 13, color: '#555', marginBottom: 16, lineHeight: 1.6 }}>
-              Sube un archivo CSV exportado desde Excel. Las columnas deben llamarse:
+            <p style={{ fontSize: 13, color: '#555', marginBottom: 8 }}>
+              El CSV debe tener columnas para TikTok y/o Instagram. La columna de categorías acepta múltiples valores separados por coma.
             </p>
-            <div style={{ background: '#F7F7F5', border: '0.5px solid #E5E5E2', borderRadius: 8, padding: '12px 14px', marginBottom: 16, fontFamily: 'monospace', fontSize: 12, color: '#555', lineHeight: 1.8 }}>
-              username_tiktok, link_tiktok, seguidores_tiktok,<br />
-              username_instagram, link_instagram, seguidores_instagram,<br />
-              categorias
-            </div>
-            <p style={{ fontSize: 12, color: '#AAA', marginBottom: 16 }}>
-              Categorías múltiples separadas por coma: <code style={{ background: '#F0F0EE', padding: '1px 5px', borderRadius: 4 }}>"Música,Lifestyle"</code>
+            <p style={{ fontSize: 12, color: '#AAA', marginBottom: 8 }}>
+              Categorías múltiples: <code style={{ background: '#F0F0EE', padding: '1px 5px', borderRadius: 4 }}>"Música,Lifestyle"</code>
             </p>
+            {categorias.length > 0 && (
+              <div style={{ marginBottom: 12, padding: '8px 12px', background: '#F7F7F5', border: '0.5px solid #E5E5E2', borderRadius: 8 }}>
+                <div style={{ fontSize: 11, color: '#AAA', marginBottom: 5 }}>Categorías disponibles en la plataforma:</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                  {categorias.map(c => {
+                    const col = catColor(c)
+                    return <span key={c} style={{ background: col.bg, color: col.color, padding: '1px 8px', borderRadius: 20, fontSize: 11 }}>{c}</span>
+                  })}
+                </div>
+                <div style={{ fontSize: 11, color: '#AAA', marginTop: 5 }}>Las categorías del CSV que no coincidan se guardarán tal cual.</div>
+              </div>
+            )}
             <p style={{ fontSize: 12, color: '#888', marginBottom: 16, background: '#F7F7F5', padding: '8px 12px', borderRadius: 8 }}>
               ℹ Los influencers que ya existan en el roster (mismo usuario TikTok o Instagram) se saltarán automáticamente.
             </p>
             <div
-              style={{
-                border: '1.5px dashed #D0D0CC', borderRadius: 10, padding: '32px 20px',
-                textAlign: 'center', cursor: 'pointer', background: '#FAFAF8', transition: 'all .15s',
-              }}
+              style={{ border: '1.5px dashed #D0D0CC', borderRadius: 10, padding: '32px 20px', textAlign: 'center', cursor: 'pointer', background: '#FAFAF8', transition: 'all .15s' }}
               onClick={() => fileRef.current?.click()}
               onMouseEnter={e => { e.currentTarget.style.borderColor = '#E8313A'; e.currentTarget.style.background = '#FEF9F9' }}
               onMouseLeave={e => { e.currentTarget.style.borderColor = '#D0D0CC'; e.currentTarget.style.background = '#FAFAF8' }}
@@ -231,7 +259,8 @@ export default function ImportarCSV({ onDone }) {
               <div style={{ fontSize: 11, color: '#AAA', marginBottom: 6 }}>¿No tienes el CSV listo? Descarga la plantilla:</div>
               <button className="btn-ghost" style={{ fontSize: 12 }}
                 onClick={() => {
-                  const content = 'username_tiktok,link_tiktok,seguidores_tiktok,username_instagram,link_instagram,seguidores_instagram,categorias\n@ejemplo,https://tiktok.com/@ejemplo,50000,@ejemplo_ig,https://instagram.com/ejemplo,30000,"Música,Lifestyle"'
+                  const cats = categorias.length > 0 ? `"${categorias.slice(0, 2).join(',')}"` : '"Música,Lifestyle"'
+                  const content = `username_tiktok,link_tiktok,seguidores_tiktok,username_instagram,link_instagram,seguidores_instagram,categorias\n@ejemplo,https://tiktok.com/@ejemplo,50000,@ejemplo_ig,https://instagram.com/ejemplo,30000,${cats}`
                   const blob = new Blob([content], { type: 'text/csv' })
                   const url = URL.createObjectURL(blob)
                   const a = document.createElement('a')
@@ -293,7 +322,7 @@ export default function ImportarCSV({ onDone }) {
                       <td style={{ padding: '9px 12px' }}>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
                           {inf.tipos_contenido.map(t => {
-                            const c = TIPO_COLORS[t] || TIPO_COLORS['Otros']
+                            const c = catColor(t)
                             return <span key={t} style={{ background: c.bg, color: c.color, padding: '1px 7px', borderRadius: 20, fontSize: 10.5 }}>{t}</span>
                           })}
                         </div>
@@ -331,43 +360,30 @@ export default function ImportarCSV({ onDone }) {
           <div style={{ padding: '16px 0' }}>
             <div style={{ textAlign: 'center', marginBottom: 20 }}>
               <div style={{ fontSize: 32, marginBottom: 12 }}>✓</div>
-              <div style={{ fontSize: 15, fontWeight: 500, marginBottom: 6 }}>
-                Importación completada
-              </div>
+              <div style={{ fontSize: 15, fontWeight: 500, marginBottom: 6 }}>Importación completada</div>
             </div>
-
             <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
-              <div style={{
-                flex: 1, background: '#EAF3DE', border: '0.5px solid #C5E0A0',
-                borderRadius: 10, padding: '12px 14px', textAlign: 'center',
-              }}>
+              <div style={{ flex: 1, background: '#EAF3DE', border: '0.5px solid #C5E0A0', borderRadius: 10, padding: '12px 14px', textAlign: 'center' }}>
                 <div style={{ fontSize: 24, fontWeight: 500, color: '#27500A' }}>{imported}</div>
                 <div style={{ fontSize: 12, color: '#3B6D11', marginTop: 3 }}>importados</div>
               </div>
               {skipped > 0 && (
-                <div style={{
-                  flex: 1, background: '#FAEEDA', border: '0.5px solid #F0D4A0',
-                  borderRadius: 10, padding: '12px 14px', textAlign: 'center',
-                }}>
+                <div style={{ flex: 1, background: '#FAEEDA', border: '0.5px solid #F0D4A0', borderRadius: 10, padding: '12px 14px', textAlign: 'center' }}>
                   <div style={{ fontSize: 24, fontWeight: 500, color: '#633806' }}>{skipped}</div>
                   <div style={{ fontSize: 12, color: '#854F0B', marginTop: 3 }}>ya existían</div>
                 </div>
               )}
             </div>
-
             {skippedNames.length > 0 && (
               <div style={{ marginBottom: 16 }}>
                 <div style={{ fontSize: 12, color: '#888', marginBottom: 6 }}>Saltados por duplicado:</div>
                 <div style={{ background: '#F7F7F5', border: '0.5px solid #E5E5E2', borderRadius: 8, padding: '8px 12px', maxHeight: 120, overflowY: 'auto' }}>
                   {skippedNames.map((name, i) => (
-                    <div key={i} style={{ fontSize: 12, color: '#888', padding: '2px 0', borderBottom: i < skippedNames.length - 1 ? '0.5px solid #F0F0EE' : 'none' }}>
-                      {name}
-                    </div>
+                    <div key={i} style={{ fontSize: 12, color: '#888', padding: '2px 0', borderBottom: i < skippedNames.length - 1 ? '0.5px solid #F0F0EE' : 'none' }}>{name}</div>
                   ))}
                 </div>
               </div>
             )}
-
             <div style={{ display: 'flex', justifyContent: 'center' }}>
               <button className="btn-red" onClick={handleClose}>Listo</button>
             </div>
