@@ -252,7 +252,8 @@ export default function VistaClienteDashboard({ token }) {
         FROM campaign_influencers ci
         JOIN influencers i ON i.id = ci.influencer_id
         WHERE ci.campaign_id = ${camp.id}
-        ORDER BY (i.ig_seguidores + i.tt_seguidores) DESC
+        ORDER BY
+          CASE WHEN ${camp.plataforma} = 'Instagram' THEN i.ig_seguidores ELSE i.tt_seguidores END DESC
       `
       setSelectedCamp({ ...camp, influencers: rows, playlists: [] })
     } catch (e) { console.error(e) }
