@@ -7,6 +7,7 @@ import Campanas from './components/Campanas'
 import Clientes from './components/Clientes'
 import ClienteDashboard from './components/ClienteDashboard'
 import Servicios from './components/Servicios'
+import PagosGlobales from './components/PagosGlobales'
 import VistaCliente from './components/VistaCliente'
 import VistaReporte from './components/VistaReporte'
 import VistaClienteDashboard from './components/VistaClienteDashboard'
@@ -82,6 +83,7 @@ export default function App() {
         {page === 'campanas'       && <Campanas initialCamp={campanaFromClient} />}
         {page === 'clientes'       && <Clientes onSelectCliente={handleSelectCliente} />}
         {page === 'servicios'      && <Servicios />}
+        {page === 'pagos-globales' && <PagosGlobales onBack={() => handleSetPage('dashboard')} />}
         {page === 'cliente-detail' && selectedClient && (
           <ClienteDashboard
             client={selectedClient}
