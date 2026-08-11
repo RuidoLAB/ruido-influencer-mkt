@@ -17,7 +17,7 @@ function useIsMobile() {
   return isMobile
 }
 
-const TIPOS_CONTENIDO = ['Bailes', 'Reviewers', 'Humor', 'Lifestyle', 'Música', 'Gaming', 'Moda', 'Fitness', 'Viajes', 'Otros']
+// categorias loaded dynamically from DB
 const TIPOS_CAMPANA = ['Estándar', 'Nano Blast', 'Clipping', 'Playlisting']
 
 const TIPO_COLORS = {
@@ -520,6 +520,7 @@ export default function Campanas({ initialCamp = null }) {
   const [roster, setRoster] = useState([])
   const [clientsList, setClientsList] = useState([])
   const [servicesList, setServicesList] = useState([])
+  const [categoriasList, setCategoriasList] = useState([])
   const [tab, setTab] = useState('Activas')
   const [filterAnio, setFilterAnio] = useState('')
   const [sortOrder, setSortOrder] = useState('reciente')
@@ -663,14 +664,16 @@ export default function Campanas({ initialCamp = null }) {
 
   async function fetchRosterAndClients() {
     try {
-      const [rosterData, clientsData, svcsData] = await Promise.all([
-        sql`SELECT * FROM influencers WHERE estado = 'Activo' ORDER BY (ig_seguidores + tt_seguidores) DESC`,
+      const [rosterData, clientsData, svcsData, catsData] = await Promise.all([
+        sql`SELECT * FROM influencers WHERE estado = 'Activo' ORDER BY tt_seguidores DESC`,
         sql`SELECT id, nombre, color FROM clients ORDER BY nombre ASC`,
         sql`SELECT id, nombre, utilizable_pct FROM services WHERE activo = true ORDER BY nombre ASC`,
+        sql`SELECT nombre FROM categorias_influencer WHERE activo = true ORDER BY nombre ASC`,
       ])
       setRoster(rosterData)
       setClientsList(clientsData)
       setServicesList(svcsData)
+      setCategoriasList(catsData.map(c => c.nombre))
     } catch (e) { console.error(e) }
   }
 
@@ -1418,7 +1421,7 @@ export default function Campanas({ initialCamp = null }) {
             <input className="input" placeholder="Buscar..." value={infSearch} onChange={e => setInfSearch(e.target.value)} style={{ flex: 1 }} />
             <select className="input" style={{ width: 120 }} value={infFilterTipo} onChange={e => setInfFilterTipo(e.target.value)}>
               <option value="">Categoría</option>
-              {TIPOS_CONTENIDO.map(t => <option key={t}>{t}</option>)}
+              {categoriasList.map(t => <option key={t}>{t}</option>)}
             </select>
             <select className="input" style={{ width: 100 }} value={infFilterSize} onChange={e => setInfFilterSize(e.target.value)}>
               <option value="">Tamaño</option>
