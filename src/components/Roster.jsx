@@ -396,9 +396,9 @@ export default function Roster() {
     setLoading(true)
     try {
       const data = await sql`
-        SELECT *, (ig_seguidores + tt_seguidores) AS total_seguidores
+        SELECT *, tt_seguidores AS total_seguidores
         FROM influencers
-        ORDER BY (ig_seguidores + tt_seguidores) DESC
+        ORDER BY tt_seguidores DESC
       `
       setInfluencers(data)
     } catch (e) { console.error(e) }
@@ -497,14 +497,11 @@ export default function Roster() {
       const tipos = i.tipos_contenido || []
       const matchTipo = !filterTipo || tipos.includes(filterTipo)
       const matchEstado = !filterEstado || i.estado === filterEstado
-      const matchSize = !filterSize || (
-        getSize(i.ig_seguidores).label === filterSize ||
-        getSize(i.tt_seguidores).label === filterSize
-      )
+      const matchSize = !filterSize || getSize(i.tt_seguidores).label === filterSize
       return matchSearch && matchTipo && matchEstado && matchSize
     })
     .sort((a, b) => {
-      const diff = Number(b.total_seguidores) - Number(a.total_seguidores)
+      const diff = Number(b.tt_seguidores) - Number(a.tt_seguidores)
       return sortAsc ? -diff : diff
     })
 
@@ -694,7 +691,7 @@ export default function Roster() {
                   <th className="th" style={{ width: 160 }}>Instagram</th>
                   <th className="th" style={{ width: 160 }}>TikTok</th>
                   <th className="th" style={{ width: 110, cursor: 'pointer', userSelect: 'none' }} onClick={() => setSortAsc(s => !s)}>
-                    Total seg. {sortAsc ? '↑' : '↓'}
+                    TikTok seg. {sortAsc ? '↑' : '↓'}
                   </th>
                   <th className="th" style={{ width: 200 }}>Categorías</th>
                   <th className="th" style={{ width: 80 }}>Estado</th>
@@ -742,7 +739,7 @@ export default function Roster() {
                         )}
                       </td>
                       <td className="td">
-                        <span style={{ fontWeight: 500, fontSize: 13 }}>{fmtSeg(Number(inf.total_seguidores))}</span>
+                        <span style={{ fontWeight: 500, fontSize: 13 }}>{fmtSeg(Number(inf.tt_seguidores))}</span>
                       </td>
                       <td className="td"><TiposBadges tipos={inf.tipos_contenido} /></td>
                       <td className="td">
