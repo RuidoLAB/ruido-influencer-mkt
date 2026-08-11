@@ -251,10 +251,12 @@ export default function VistaCliente({ token }) {
         budget_total: rows[0].budget_total || 0,
         es_legacy: rows[0].es_legacy || false,
         moneda: rows[0].moneda || 'CLP',
-        influencers: rows.sort((a, b) =>
-          (Number(b.ig_seguidores) + Number(b.tt_seguidores)) -
-          (Number(a.ig_seguidores) + Number(a.tt_seguidores))
-        ),
+        influencers: rows.sort((a, b) => {
+          if (rows[0]?.plataforma === 'Instagram') {
+            return Number(b.ig_seguidores) - Number(a.ig_seguidores)
+          }
+          return Number(b.tt_seguidores) - Number(a.tt_seguidores)
+        }),
       })
     } catch (e) { console.error(e); setError('error') }
     setLoading(false)
