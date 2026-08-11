@@ -121,8 +121,10 @@ export default function PagosGlobales({ onBack }) {
             )) AS pagos_raw
           FROM influencers i
           JOIN campaign_influencers ci ON ci.influencer_id = i.id
+          JOIN campaigns c ON c.id = ci.campaign_id
           WHERE ci.estado_pago != 'Pagado'
             AND ci.costo > 0
+            AND c.estado IN ('Activa', 'Cerrada')
           GROUP BY i.id, i.nombre, i.tt_usuario, i.tt_seguidores, i.tt_link, i.ig_usuario
         `
         const processed = rows.map(r => {
@@ -157,6 +159,7 @@ export default function PagosGlobales({ onBack }) {
         WHERE ci.influencer_id = ${infId}
           AND ci.estado_pago != 'Pagado'
           AND ci.costo > 0
+          AND c.estado IN ('Activa', 'Cerrada')
         ORDER BY c.created_at DESC
       `
       setDetalle(rows)
