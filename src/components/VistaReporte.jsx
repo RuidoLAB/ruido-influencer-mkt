@@ -244,8 +244,8 @@ export default function VistaReporte({ token }) {
       {/* Header */}
       <div style={{ background: '#111', padding: '28px 40px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-          <div style={{ width: 28, height: 28, background: '#E8313A', borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#fff' }}>R</div>
-          <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', letterSpacing: '.05em' }}>RUIDO LAB — Reporte de campaña</span>
+          <div style={{ width: 28, height: 28, background: '#E8313A', borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#fff' }}>K</div>
+          <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', letterSpacing: '.05em' }}>KOLINSET — Reporte de campaña</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16, marginBottom: 24 }}>
           <div>
@@ -489,7 +489,7 @@ export default function VistaReporte({ token }) {
         )}
 
         <div style={{ marginTop: 24, textAlign: 'center', fontSize: 11, color: '#CCC' }}>
-          Reporte generado por RUIDO LAB — Influencer MKT
+          Reporte generado por KOLINSET — Influencer MKT
         </div>
       </div>
     </div>
