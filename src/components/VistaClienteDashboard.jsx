@@ -576,7 +576,7 @@ export default function VistaClienteDashboard({ token }) {
           )}
 
           <div style={{ marginTop: 24, textAlign: 'center', fontSize: 11, color: '#CCC' }}>
-            Portal generado por RUIDO LAB — Influencer MKT
+            Portal generado por KOLINSET — Influencer MKT
           </div>
         </div>
       </div>
@@ -838,7 +838,7 @@ export default function VistaClienteDashboard({ token }) {
         )}
 
         <div style={{ marginTop: 28, textAlign: 'center', fontSize: 11, color: '#CCC' }}>
-          Portal generado por RUIDO LAB — Influencer MKT
+          Portal generado por KOLINSET — Influencer MKT
         </div>
       </div>
     </div>
