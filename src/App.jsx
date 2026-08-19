@@ -43,12 +43,12 @@ export default function App() {
     if (token) { setPublicToken(token); return }
     if (report) { setReportToken(report); return }
     if (clientDash) { setClientDashboardToken(clientDash); return }
-    const saved = localStorage.getItem('ruido_auth')
+    const saved = localStorage.getItem('kolinset_auth')
     if (saved === 'true') setAuth(true)
   }, [])
 
   function handleLogout() {
-    localStorage.removeItem('ruido_auth')
+    localStorage.removeItem('kolinset_auth')
     setAuth(false)
   }
 
