@@ -65,9 +65,9 @@ export default function Sidebar({ page, setPage, onLogout }) {
 
           {/* Logo */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 20px 14px', borderBottom: '0.5px solid #F0F0EE' }}>
-            <div style={{ width: 28, height: 28, background: '#E8313A', borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#fff' }}>R</div>
+            <div style={{ width: 28, height: 28, background: '#E8313A', borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#fff' }}>K</div>
             <div>
-              <div style={{ fontSize: 14, fontWeight: 500 }}>RUIDO LAB</div>
+              <div style={{ fontSize: 14, fontWeight: 500 }}>KOLINSET</div>
               <div style={{ fontSize: 11, color: '#AAA' }}>Influencer MKT</div>
             </div>
           </div>
@@ -171,9 +171,9 @@ export default function Sidebar({ page, setPage, onLogout }) {
       display: 'flex', flexDirection: 'column', flexShrink: 0, minHeight: '100vh',
     }}>
       <div style={{ padding: '20px 16px', borderBottom: '0.5px solid #E5E5E2', display: 'flex', alignItems: 'center', gap: 10 }}>
-        <div style={{ width: 28, height: 28, background: '#E8313A', borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#fff', flexShrink: 0 }}>R</div>
+        <div style={{ width: 28, height: 28, background: '#E8313A', borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#fff', flexShrink: 0 }}>K</div>
         <div>
-          <div style={{ fontSize: 14, fontWeight: 500 }}>RUIDO LAB</div>
+          <div style={{ fontSize: 14, fontWeight: 500 }}>KOLINSET</div>
           <div style={{ fontSize: 11, color: '#AAA' }}>Influencer MKT</div>
         </div>
       </div>
