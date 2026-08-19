@@ -12,7 +12,7 @@ export default function Login({ onLogin }) {
 
     setTimeout(() => {
       if (password === import.meta.env.VITE_APP_PASSWORD) {
-        localStorage.setItem('ruido_auth', 'true')
+        localStorage.setItem('kolinset_auth', 'true')
         onLogin()
       } else {
         setError(true)
@@ -38,9 +38,9 @@ export default function Login({ onLogin }) {
             width: 32, height: 32, background: '#E8313A', borderRadius: 8,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: 14, fontWeight: 700, color: '#fff',
-          }}>R</div>
+          }}>K</div>
           <div>
-            <div style={{ fontSize: 15, fontWeight: 500 }}>RUIDO</div>
+            <div style={{ fontSize: 15, fontWeight: 500 }}>KOLINSET</div>
             <div style={{ fontSize: 11, color: '#AAA' }}>Influencer MKT</div>
           </div>
         </div>
