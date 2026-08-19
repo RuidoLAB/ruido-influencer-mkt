@@ -313,8 +313,8 @@ export default function VistaCliente({ token }) {
       {/* Header */}
       <div style={{ background: '#111', padding: '28px 40px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-          <div style={{ width: 28, height: 28, background: '#E8313A', borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#fff' }}>R</div>
-          <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', letterSpacing: '.05em' }}>RUIDO LAB — Influencer MKT</span>
+          <div style={{ width: 28, height: 28, background: '#E8313A', borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#fff' }}>K</div>
+          <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', letterSpacing: '.05em' }}>KOLINSET — Influencer MKT</span>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, marginBottom: 16 }}>
@@ -581,7 +581,7 @@ export default function VistaCliente({ token }) {
         )}
 
         <div style={{ marginTop: 20, textAlign: 'center', fontSize: 11, color: '#CCC' }}>
-          Propuesta generada por RUIDO LAB — Influencer MKT
+          Propuesta generada por KOLINSET — Influencer MKT
         </div>
       </div>
     </div>
