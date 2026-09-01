@@ -550,6 +550,7 @@ export default function Campanas({ initialCamp = null }) {
   const [ultimoPrecioCI, setUltimoPrecioCI] = useState(null)
 
   const [deleteCampId, setDeleteCampId] = useState(null)
+  const [duplicatingCampId, setDuplicatingCampId] = useState(null)
   const [deleteCI, setDeleteCI] = useState(null)
   const [changeEstadoModal, setChangeEstadoModal] = useState(false)
 
@@ -575,7 +576,7 @@ export default function Campanas({ initialCamp = null }) {
     } catch (e) { console.error(e) }
   }
 
-  async function fetchCamps() {
+  async function fetchCamps(selectId) {
     setLoading(true)
     try {
       const data = await sql`
@@ -656,8 +657,9 @@ export default function Campanas({ initialCamp = null }) {
         })
       }))
       setCamps(list)
-      if (currentCamp) {
-        const updated = list.find(c => c.id === currentCamp.id)
+      const idToSelect = selectId || currentCamp?.id
+      if (idToSelect) {
+        const updated = list.find(c => c.id === idToSelect)
         if (updated) setCurrentCamp(updated)
       }
     } catch (e) { console.error(e) }
@@ -809,6 +811,70 @@ export default function Campanas({ initialCamp = null }) {
       if (currentCamp?.id === id) setCurrentCamp(null)
       await fetchCamps()
     } catch (e) { console.error(e) }
+  }
+
+  async function duplicateCamp(camp) {
+    setDuplicatingCampId(camp.id)
+    try {
+      const [newRow] = await sql`
+        INSERT INTO campaigns (nombre, cliente, client_id, budget, budget_total, moneda, brief, plataforma, share_token, artista, cancion, fecha_inicio, fecha_termino, reporte_url_tt, reporte_url_ig, tipo, contenidos_count, views_logradas, views_min, views_max, service_id, utilizable_pct, solicitado_por, es_legacy)
+        VALUES (
+          ${camp.nombre + ' (copia)'},
+          '', NULL,
+          ${camp.budget || 0}, ${camp.budget_total || 0},
+          ${camp.moneda}, ${camp.brief || ''},
+          ${camp.plataforma || 'Ambas'}, ${crypto.randomUUID()},
+          ${camp.artista || ''}, ${camp.cancion || ''},
+          ${camp.fecha_inicio || null}, ${camp.fecha_termino || null},
+          '', '',
+          ${camp.tipo || 'Influencer MKT'},
+          ${camp.contenidos_count || 0},
+          0,
+          ${camp.views_min || 0}, ${camp.views_max || 0},
+          ${camp.service_id || null},
+          ${camp.utilizable_pct != null ? camp.utilizable_pct : 100},
+          ${camp.solicitado_por || ''},
+          false
+        )
+        RETURNING id
+      `
+      const newId = newRow.id
+
+      for (const inf of camp.influencers) {
+        await sql`
+          INSERT INTO campaign_influencers (campaign_id, influencer_id, costo, piezas, estado, notas, video_link_tt, video_link_ig, boostcode, estado_pago, link_boleta, tipo_facturacion)
+          VALUES (
+            ${newId}, ${inf.influencer_id}, ${inf.costo || 0}, ${inf.piezas || 1},
+            ${inf.ci_estado || 'Contactado'}, ${inf.ci_notas || ''},
+            '', '',
+            ${inf.boostcode || ''}, 'Pendiente', '',
+            ${inf.tipo_facturacion || 'sin_recargo'}
+          )
+        `
+      }
+
+      await fetchCamps(newId)
+      // Abrir directo el modal de edición para que puedan renombrarla
+      setEditCampForm({
+        nombre: camp.nombre + ' (copia)',
+        cliente: '', client_id: '',
+        budget: camp.budget, moneda: camp.moneda,
+        brief: camp.brief || '', plataforma: camp.plataforma || 'Ambas',
+        artista: camp.artista || '', cancion: camp.cancion || '',
+        fecha_inicio: camp.fecha_inicio || '', fecha_termino: camp.fecha_termino || '',
+        reporte_url_tt: '', reporte_url_ig: '',
+        tipo: camp.tipo || 'Influencer MKT',
+        contenidos_count: camp.contenidos_count || '',
+        views_logradas: '',
+        views_min: camp.views_min || '', views_max: camp.views_max || '',
+        service_id: camp.service_id ? String(camp.service_id) : '',
+        utilizable_pct: camp.utilizable_pct || '',
+        solicitado_por: camp.solicitado_por || '',
+      })
+      setEditCampFormError('')
+      setEditCampModal(true)
+    } catch (e) { console.error(e) }
+    setDuplicatingCampId(null)
   }
 
   // Playlist CRUD
@@ -1105,6 +1171,9 @@ export default function Campanas({ initialCamp = null }) {
               )}
               <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                 <button className="btn-ghost" onClick={openEditCamp} style={{ fontSize: 11.5, padding: '5px 10px' }}>✎ Editar</button>
+                <button className="btn-ghost" onClick={() => duplicateCamp(currentCamp)} disabled={duplicatingCampId === currentCamp.id} style={{ fontSize: 11.5, padding: '5px 10px' }}>
+                  {duplicatingCampId === currentCamp.id ? 'Duplicando...' : '⧉ Duplicar'}
+                </button>
                 <button className="btn-ghost" onClick={() => setChangeEstadoModal(true)} style={{ fontSize: 11.5, padding: '5px 10px' }}>Estado</button>
                 {!isReadOnly && !isEspecial && campTab === 'influencers' && (
                   <button className="btn-red" onClick={openAddInfModal} style={{ fontSize: 11.5, padding: '5px 10px' }}>+ Influs</button>
@@ -1658,6 +1727,10 @@ export default function Campanas({ initialCamp = null }) {
                   <div style={{ fontSize: 14, fontWeight: 500, flex: 1, paddingRight: 8 }}>{camp.nombre}</div>
                   <div style={{ display: 'flex', gap: 5, flexShrink: 0 }}>
                     <span style={{ fontSize: 10.5, padding: '1px 7px', borderRadius: 20, background: ec.bg, color: ec.color }}>{camp.estado}</span>
+                    <button className="btn-icon" title="Duplicar campaña" disabled={duplicatingCampId === camp.id}
+                      onClick={e => { e.stopPropagation(); duplicateCamp(camp) }}>
+                      {duplicatingCampId === camp.id ? '…' : '⧉'}
+                    </button>
                     <button className="btn-icon btn-icon-danger" onClick={e => { e.stopPropagation(); setDeleteCampId(camp.id) }}>✕</button>
                   </div>
                 </div>
