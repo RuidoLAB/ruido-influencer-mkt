@@ -764,6 +764,7 @@ export default function Campanas({ initialCamp = null }) {
     if (err) { setEditCampFormError(err); return }
     setEditCampFormError('')
     setSavingEditCamp(true)
+    const tipoCambio = (currentCamp.tipo || 'Influencer MKT') !== (editCampForm.tipo || 'Influencer MKT')
     try {
       await sql`
         UPDATE campaigns SET
@@ -790,6 +791,9 @@ export default function Campanas({ initialCamp = null }) {
           solicitado_por = ${editCampForm.solicitado_por || ''}
         WHERE id = ${currentCamp.id}
       `
+      if (tipoCambio) {
+        await sql`DELETE FROM campaign_influencers WHERE campaign_id = ${currentCamp.id}`
+      }
       setEditCampModal(false)
       await fetchCamps()
     } catch (e) { console.error(e) }
@@ -844,7 +848,7 @@ export default function Campanas({ initialCamp = null }) {
         await sql`
           INSERT INTO campaign_influencers (campaign_id, influencer_id, costo, piezas, estado, notas, video_link_tt, video_link_ig, boostcode, estado_pago, link_boleta, tipo_facturacion)
           VALUES (
-            ${newId}, ${inf.influencer_id}, ${inf.costo || 0}, ${inf.piezas || 1},
+            ${newId}, ${inf.influencer_id}, 0, ${inf.piezas || 1},
             ${inf.ci_estado || 'Contactado'}, ${inf.ci_notas || ''},
             '', '',
             ${inf.boostcode || ''}, 'Pendiente', '',
@@ -1781,4 +1785,3 @@ export default function Campanas({ initialCamp = null }) {
     </div>
   )
 }
- 
