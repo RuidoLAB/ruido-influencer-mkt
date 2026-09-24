@@ -3,10 +3,10 @@ import { useState, useEffect } from 'react'
 // Mapea sobrenombres/variantes al nombre completo de cada solicitante,
 // así el filtro los agrupa aunque estén cargados distinto en cada campaña.
 const SOLICITANTES_ALIAS = [
-  { canonical: 'Valeria Moraga', aliases: ['valeria moraga', 'vale moraga', 'vale', 'valeria'] },
-  { canonical: 'Gabriela Albarracín', aliases: ['gabriela albarracin', 'gabriela albarracín', 'gaby', 'gabriela'] },
-  { canonical: 'Dominique De Solminihac', aliases: ['dominique de solminihac', 'domi', 'dominique'] },
-  { canonical: 'Juan Pablo López', aliases: ['juan pablo lopez', 'juan pablo lópez', 'juan pablo', 'jp'] },
+  { canonical: 'Valeria Moraga', aliases: ['valeria moraga', 'vale moraga', 'valeria', 'vale'] },
+  { canonical: 'Gabriela Albarracín', aliases: ['gabriela albarracin', 'gaby albarracin', 'gabriela', 'gaby'] },
+  { canonical: 'Dominique De Solminihac', aliases: ['dominique de solminihac', 'domi de solminihac', 'dominique', 'domi'] },
+  { canonical: 'Juan Pablo López', aliases: ['juan pablo lopez', 'jp lopez', 'juan pablo', 'jp'] },
 ]
 
 function stripAccents(s) {
