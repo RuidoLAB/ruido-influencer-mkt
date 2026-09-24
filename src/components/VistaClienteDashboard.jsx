@@ -6,7 +6,7 @@ const SOLICITANTES_ALIAS = [
   { canonical: 'Valeria Moraga', aliases: ['valeria moraga', 'vale moraga', 'valeria', 'vale'] },
   { canonical: 'Gabriela Albarracín', aliases: ['gabriela albarracin', 'gaby albarracin', 'gabriela', 'gaby'] },
   { canonical: 'Dominique De Solminihac', aliases: ['dominique de solminihac', 'domi de solminihac', 'dominique', 'domi'] },
-  { canonical: 'Juan Pablo López', aliases: ['juan pablo lopez', 'jp lopez', 'juan pablo', 'jp'] },
+  { canonical: 'Juan Pablo Jiménez', aliases: ['juan pablo jimenez', 'jp jimenez', 'juan pablo', 'jp'] },
 ]
 
 function stripAccents(s) {
