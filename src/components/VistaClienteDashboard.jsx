@@ -1,4 +1,24 @@
 import { useState, useEffect } from 'react'
+
+// Mapea sobrenombres/variantes al nombre completo de cada solicitante,
+// así el filtro los agrupa aunque estén cargados distinto en cada campaña.
+const SOLICITANTES_ALIAS = [
+  { canonical: 'Valeria Moraga', aliases: ['valeria moraga', 'vale moraga', 'vale', 'valeria'] },
+  { canonical: 'Gabriela Albarracín', aliases: ['gabriela albarracin', 'gabriela albarracín', 'gaby', 'gabriela'] },
+  { canonical: 'Dominique De Solminihac', aliases: ['dominique de solminihac', 'domi', 'dominique'] },
+  { canonical: 'Juan Pablo López', aliases: ['juan pablo lopez', 'juan pablo lópez', 'juan pablo', 'jp'] },
+]
+
+function stripAccents(s) {
+  return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+}
+
+function normalizeSolicitante(raw) {
+  if (!raw || !raw.trim()) return null
+  const clean = stripAccents(raw.trim().toLowerCase())
+  const found = SOLICITANTES_ALIAS.find(p => p.aliases.some(a => stripAccents(a) === clean))
+  return found ? found.canonical : raw.trim()
+}
 import sql from '../lib/db'
 
 const ESTADO_CAMP_COLORS = {
@@ -175,6 +195,7 @@ export default function VistaClienteDashboard({ token }) {
   const [search, setSearch] = useState('')
   const [filterEstado, setFilterEstado] = useState('')
   const [filterAnio, setFilterAnio] = useState('')
+  const [filterSolicitante, setFilterSolicitante] = useState('')
   const [sortOrder, setSortOrder] = useState('reciente')
   const [filtersOpen, setFiltersOpen] = useState(false)
 
@@ -590,6 +611,7 @@ export default function VistaClienteDashboard({ token }) {
   const totalInfluencers = camps.reduce((s, c) => s + Number(c.total_influencers), 0)
   const totalVideos = camps.reduce((s, c) => s + Number(c.videos_publicados), 0)
   const anios = [...new Set(camps.map(c => c.created_at ? new Date(c.created_at).getFullYear() : null).filter(Boolean))].sort((a, b) => b - a)
+  const solicitantes = [...new Set(camps.map(c => normalizeSolicitante(c.solicitado_por)).filter(Boolean))].sort()
 
   const filtered = camps
     .filter(c => {
@@ -599,14 +621,15 @@ export default function VistaClienteDashboard({ token }) {
         (c.cancion || '').toLowerCase().includes(q)
       const matchEstado = !filterEstado || c.estado === filterEstado
       const matchAnio = !filterAnio || (c.created_at && new Date(c.created_at).getFullYear() === parseInt(filterAnio))
-      return matchSearch && matchEstado && matchAnio
+      const matchSolicitante = !filterSolicitante || normalizeSolicitante(c.solicitado_por) === filterSolicitante
+      return matchSearch && matchEstado && matchAnio && matchSolicitante
     })
     .sort((a, b) => sortOrder === 'reciente'
       ? new Date(b.created_at) - new Date(a.created_at)
       : new Date(a.created_at) - new Date(b.created_at)
     )
 
-  const activeFiltersCount = [filterEstado, filterAnio].filter(Boolean).length
+  const activeFiltersCount = [filterEstado, filterAnio, filterSolicitante].filter(Boolean).length
   const kpiList = [
     { label: 'Total campañas', value: totalCamps },
     { label: 'Activas', value: activas },
@@ -664,6 +687,12 @@ export default function VistaClienteDashboard({ token }) {
                     {anios.map(a => <option key={a}>{a}</option>)}
                   </select>
                 )}
+                {solicitantes.length > 1 && (
+                  <select className="input" value={filterSolicitante} onChange={e => setFilterSolicitante(e.target.value)} style={{ minHeight: 42 }}>
+                    <option value="">Todos los solicitantes</option>
+                    {solicitantes.map(s => <option key={s}>{s}</option>)}
+                  </select>
+                )}
                 <select className="input" value={sortOrder} onChange={e => setSortOrder(e.target.value)} style={{ minHeight: 42 }}>
                   <option value="reciente">Más reciente</option>
                   <option value="antigua">Más antigua</option>
@@ -683,6 +712,12 @@ export default function VistaClienteDashboard({ token }) {
               <select className="input" value={filterAnio} onChange={e => setFilterAnio(e.target.value)}>
                 <option value="">Todos los años</option>
                 {anios.map(a => <option key={a}>{a}</option>)}
+              </select>
+            )}
+            {solicitantes.length > 1 && (
+              <select className="input" value={filterSolicitante} onChange={e => setFilterSolicitante(e.target.value)}>
+                <option value="">Todos los solicitantes</option>
+                {solicitantes.map(s => <option key={s}>{s}</option>)}
               </select>
             )}
             <select className="input" value={sortOrder} onChange={e => setSortOrder(e.target.value)}>
