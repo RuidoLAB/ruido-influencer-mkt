@@ -1,25 +1,26 @@
 import { useState } from 'react'
+import supabase from '../lib/supabaseClient'
 
 export default function Login({ onLogin }) {
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [error, setError] = useState(false)
+  const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault()
     setLoading(true)
-    setError(false)
+    setError('')
 
-    setTimeout(() => {
-      if (password === import.meta.env.VITE_APP_PASSWORD) {
-        localStorage.setItem('kolinset_auth', 'true')
-        onLogin()
-      } else {
-        setError(true)
-        setPassword('')
-      }
-      setLoading(false)
-    }, 400)
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
+
+    if (error) {
+      setError('Email o contraseña incorrectos.')
+      setPassword('')
+    } else {
+      onLogin()
+    }
+    setLoading(false)
   }
 
   return (
@@ -46,18 +47,29 @@ export default function Login({ onLogin }) {
         </div>
 
         <h1 style={{ fontSize: 18, fontWeight: 500, marginBottom: 6 }}>Bienvenido</h1>
-        <p style={{ fontSize: 13, color: '#AAA', marginBottom: 24 }}>Ingresa la contraseña para acceder.</p>
+        <p style={{ fontSize: 13, color: '#AAA', marginBottom: 24 }}>Ingresá con tu cuenta para acceder.</p>
 
         <form onSubmit={handleSubmit}>
+          <div className="fg">
+            <label className="label">Email</label>
+            <input
+              className="input"
+              type="email"
+              value={email}
+              onChange={e => { setEmail(e.target.value); setError('') }}
+              placeholder="nombre@kolinset.com"
+              autoFocus
+            />
+          </div>
+
           <div className="fg">
             <label className="label">Contraseña</label>
             <input
               className="input"
               type="password"
               value={password}
-              onChange={e => { setPassword(e.target.value); setError(false) }}
+              onChange={e => { setPassword(e.target.value); setError('') }}
               placeholder="••••••••"
-              autoFocus
               style={{
                 borderColor: error ? '#E8313A' : undefined,
                 background: error ? '#FCEBEB' : undefined,
@@ -65,7 +77,7 @@ export default function Login({ onLogin }) {
             />
             {error && (
               <div style={{ fontSize: 12, color: '#A32D2D', marginTop: 4 }}>
-                Contraseña incorrecta. Intenta de nuevo.
+                {error}
               </div>
             )}
           </div>
@@ -73,7 +85,7 @@ export default function Login({ onLogin }) {
           <button
             type="submit"
             className="btn-red"
-            disabled={loading || !password}
+            disabled={loading || !password || !email}
             style={{ width: '100%', justifyContent: 'center', marginTop: 4 }}
           >
             {loading ? 'Verificando...' : 'Entrar'}
