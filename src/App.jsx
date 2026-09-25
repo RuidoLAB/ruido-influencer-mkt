@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import supabase from './lib/supabaseClient'
 import Login from './components/Login'
 import Sidebar from './components/Sidebar'
 import Dashboard from './components/Dashboard'
@@ -43,12 +44,18 @@ export default function App() {
     if (token) { setPublicToken(token); return }
     if (report) { setReportToken(report); return }
     if (clientDash) { setClientDashboardToken(clientDash); return }
-    const saved = localStorage.getItem('kolinset_auth')
-    if (saved === 'true') setAuth(true)
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setAuth(!!session)
+    })
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setAuth(!!session)
+    })
+    return () => listener.subscription.unsubscribe()
   }, [])
 
   function handleLogout() {
-    localStorage.removeItem('kolinset_auth')
+    supabase.auth.signOut()
     setAuth(false)
   }
 
